@@ -36,5 +36,4 @@ htmlcov/
 # Node (frontend tooling, if any)
 node_modules/
 
-# Claude Code tool state — machine-local, never shared (plan lives in docs/ instead)
 .claude/
