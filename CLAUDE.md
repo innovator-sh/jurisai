@@ -9,7 +9,7 @@ by police, lawyers, and the general public — not a demo or student project. It
 questions against the Indian Penal Code (IPC) today and is being designed so the
 Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1 July
 2024, can be onboarded as a second corpus without a rewrite. See
-`.claude/plans/production-hardening-plan.md` for the full architecture and sprint plan —
+`docs/production-hardening-plan.md` for the full architecture and sprint plan —
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
@@ -69,7 +69,7 @@ jurisai_greenfield/
 ├── data/                   # ipc/, bns/, crosswalk/ (LFS)
 ├── scripts/                # ingest, seed, migrate, build-crosswalk
 ├── docs/decisions.md       # ADR-style notes, one per sprint
-├── DESCREPENCIES.MD        # open-issue register — see "Rules when editing" below
+├── DISCREPANCIES.MD        # open-issue register — see "Rules when editing" below
 ├── pyproject.toml
 ├── Dockerfile / docker-compose.yml
 ├── .env.example
@@ -91,7 +91,7 @@ jurisai_greenfield/
 
 ## Rules when editing
 
-- **`DESCREPENCIES.MD` is frozen mid-sprint.** Read it at sprint start, don't edit it until
+- **`DISCREPANCIES.MD` is frozen mid-sprint.** Read it at sprint start, don't edit it until
   the sprint boundary reconciliation. New findings mid-sprint go in a scratch
   `DISCOVERED.md` instead.
 - **Never hardcode credentials.** All config comes from environment variables via
