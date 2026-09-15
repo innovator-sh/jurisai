@@ -69,7 +69,8 @@ jurisai_greenfield/
 ├── data/                   # ipc/, bns/, crosswalk/ (LFS)
 ├── scripts/                # ingest, seed, migrate, build-crosswalk
 ├── docs/decisions.md       # ADR-style notes, one per sprint
-├── DISCREPANCIES.MD        # open-issue register — see "Rules when editing" below
+├── docs/production-hardening-plan.md
+├── DISCREPANCIES.MD        # pointer only — issues tracked in the repo's Issues tab
 ├── pyproject.toml
 ├── Dockerfile / docker-compose.yml
 ├── .env.example
@@ -91,9 +92,11 @@ jurisai_greenfield/
 
 ## Rules when editing
 
-- **`DISCREPANCIES.MD` is frozen mid-sprint.** Read it at sprint start, don't edit it until
-  the sprint boundary reconciliation. New findings mid-sprint go in a scratch
-  `DISCOVERED.md` instead.
+- **Open issues live in the repo's Issues tab, not in a committed file.**
+  `DISCREPANCIES.MD` is a pointer only — see "Open-issue tracking" in the plan for why
+  (short version: a committed register can't be cleanly removed from git history if this
+  repo ever goes public). File findings as issues immediately, labeled `severity:SX` and
+  `sprint:N`; a sprint closes only the issues labeled for it.
 - **Never hardcode credentials.** All config comes from environment variables via
   `app/config.py` (pydantic-settings), which fails fast at startup if one is missing.
 - **Do not use "capstone" or "diploma" framing** in code comments, docs, or the UI — this

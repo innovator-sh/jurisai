@@ -116,8 +116,8 @@ maps onto it unchanged.
 
 The handbook's rules are adopted literally and govern every sprint:
 
-- **Explore → Plan → Code → Commit.** No sprint starts without its slice of
-  `DISCREPANCIES.md` read and its acceptance criteria written down.
+- **Explore → Plan → Code → Commit.** No sprint starts without its slice of open issues
+  (filtered by `sprint:N`) read and its acceptance criteria written down.
 - **Small, shippable vertical slices.** Each sprint below ends with a runnable app and a
   commit. No sprint spans more than one architectural concern.
 - **Prompt with intent.** Every subagent gets testable acceptance criteria, not a vibe.
@@ -142,24 +142,32 @@ The handbook's rules are adopted literally and govern every sprint:
 - `CLAUDE.md` (at `jurisai_greenfield/CLAUDE.md`) is the shared context so agents don't
   re-derive conventions. It is updated at the end of each sprint, not during.
 
-### `DISCREPANCIES.md` — the open-issue register
+### Open-issue tracking
 
-Lives at `jurisai_greenfield/DISCREPANCIES.MD` (repo root once pushed) — already created;
-seeded with the findings below as the first Sprint 0 commit. Frozen for the duration of a
-sprint: **no edits mid-sprint.** It is reconciled only at a sprint boundary, in one commit.
+Findings are tracked as **GitHub Issues** on this repo, not as a committed markdown file.
+`DISCREPANCIES.MD` at the repo root is a one-paragraph pointer only.
 
-Row format:
+**Why not a committed register:** this repo may go public later, and a committed file's
+full history survives in `git log` even after the file is edited or deleted — there is no
+clean way to "remove" it retroactively short of rewriting history. A checklist of a
+private prototype's exploitable vulnerabilities is exactly the kind of content that
+shouldn't depend on remembering to scrub git history before a visibility change. Issues
+are separate database records, not part of the commit history, so this problem doesn't
+arise — the repo's code can go public on its own schedule regardless of what the Issues
+tab shows or whether it's restricted.
 
-```
-| ID | Severity | Area | Issue | Evidence (file:line) | Sprint | Status |
-```
+**Conventions:**
 
-- `Severity`: S0 exploitable / S1 broken / S2 correctness / S3 hygiene.
-- `Status`: `open` → `in-sprint-N` → `fixed` (with the commit SHA) → `wontfix` (with a reason).
-- Seeded with the ~40 findings from this audit (enumerated in the appendix below).
-- Anything discovered mid-sprint goes into a scratch `DISCOVERED.md` and is merged into the
-  register at the boundary. This is what keeps the register a stable contract rather than a
-  moving target.
+- Labels: `severity:S0` (exploitable) / `severity:S1` (broken) / `severity:S2`
+  (correctness) / `severity:S3` (hygiene), and `sprint:0` … `sprint:6` / `sprint:3B`.
+- The pre-Sprint-0 audit of the legacy prototype seeded 60 issues this way (#3–#62);
+  two are closed `wontfix` for legacy files never ported into this tree.
+- A finding discovered mid-sprint is filed as an issue immediately — there's no reason to
+  batch it in a scratch file the way a shared document would require. What stays
+  disciplined is scope: a sprint closes only the issues labeled for it, so a mid-sprint
+  discovery doesn't silently expand what "done" means for the sprint in progress.
+- Closing an issue references the commit SHA that fixed it; `wontfix` closures get a
+  comment with the reason, same as the old `Status` column did.
 
 ---
 
@@ -208,7 +216,8 @@ jurisai_greenfield/              # == repo root of github.com/innovator-sh/juris
 │   └── crosswalk/ipc_bns.csv   # reviewed section mapping, versioned
 ├── scripts/                    # ingest, seed, migrate, build-crosswalk
 ├── docs/decisions.md
-├── DISCREPANCIES.md
+├── docs/production-hardening-plan.md
+├── DISCREPANCIES.MD             # pointer only — issues tracked in the repo's Issues tab
 ├── CLAUDE.md
 ├── pyproject.toml              # deps + ruff + mypy + pytest config
 ├── Dockerfile                  # multi-stage, non-root
@@ -402,7 +411,8 @@ or `repealed`. Never present a section number without its act. The
 ## Sprints
 
 Each sprint is a branch, ends with `/code-review` on the diff, a human read, a commit, an
-ADR note, and a `DISCREPANCIES.md` reconciliation. **The app must run at the end of every sprint.**
+ADR note, and closing the issues labeled for it (`sprint:N`). **The app must run at the
+end of every sprint.**
 
 ### Sprint 0 — Contain the breach, stand up the real repo
 
@@ -424,15 +434,24 @@ credentials are still real and still exposed on this machine, so they still get 
 3. Add `.gitignore` (`.venv/`, `__pycache__/`, `*.log`, `db/`, `.env`, `offload_weights/`).
 4. Create `.env.example` listing every config var by name, no values. New credentials
    (post-rotation) go only into a local `.env`, never into a tracked file.
-5. Copy `DISCREPANCIES.MD` content in (seeded from the appendix below) as the first commit.
+5. Seed the open-issue register as the first commit: the pointer file `DISCREPANCIES.MD`
+   plus the 60 findings from the appendix below, filed as GitHub Issues (see
+   "Open-issue tracking" above for why issues, not a committed file).
 6. **Verify with `gitleaks detect` before the first push** — this repo has no history to
    worry about, but a clean first commit is the cheapest guarantee it stays that way.
-7. First push to `main` (or a `sprint-0` branch if you'd rather review before it lands
-   on `main` — your call, flag which you prefer).
+7. First push to a `sprint-0` branch, reviewed via PR before it lands on `main`.
+
+**Done, as executed:** pushed via PR #1 (seed commit) and PR #2 (`DISCREPANCIES.MD`
+rename + move to `docs/`, plus the Issues migration in #3–#62). `gitleaks` was installed
+via a direct GitHub release download rather than chocolatey (which needed elevation) and
+came back clean on both tree and history.
 
 **Exit criteria:** `github.com/innovator-sh/jurisai` contains `.gitignore`, `.env.example`,
-and a seeded `DISCREPANCIES.MD`; `gitleaks` clean; rotated credentials confirmed working;
+and the seeded issues (#3–#62); `gitleaks` clean; rotated credentials confirmed working;
 `jurisai/` (legacy) untouched on disk and never staged.
+
+**Still open from this sprint:** credential rotation (Atlas password, Mistral key,
+Firebase key restriction) is human-only and not yet confirmed done.
 
 ### Sprint 1 — Foundation: repo, deps, config, CI
 
@@ -614,7 +633,8 @@ a `<img src=x onerror=alert(1)>` answer renders as text; Lighthouse a11y ≥ 90.
 5. `README.md`: architecture diagram, setup, ingest, deploy, a **"How to add a corpus"**
    runbook (BNSS/BSA are the next candidates), corpus provenance table, the MVP-vs-funded
    stack table, and the disclaimer required by item 4.
-6. Final `DISCREPANCIES.md` reconciliation; everything `fixed` or `wontfix` with a reason.
+6. Final issue-tracker reconciliation: every issue from the original audit is `closed`
+   (fixed, with the commit SHA) or `wontfix` (with a reason) — none left open.
 7. Update `CLAUDE.md` to the new structure.
 
 **Exit criteria:** a clean clone → `docker compose up` → working app, guided only by the
@@ -711,7 +731,7 @@ human read. End-to-end, before calling it done:
 - **Corpus drift.** BNS is new and will see corrections and amendments. `ingest_version` on
   chunks and on stored answers is what makes a re-ingest auditable; keep it populated.
 
-## Appendix — `DISCREPANCIES.md` seed (to be created in Sprint 0)
+## Appendix — original audit findings (filed as GitHub Issues #3–#62 in Sprint 0)
 
 **S0 — exploitable:** hardcoded Atlas URI `app.py:25` · hardcoded Mistral key `app.py:39` ·
 committed Firebase key `register.js:10` · no authentication anywhere · IDOR on
