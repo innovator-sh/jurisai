@@ -117,7 +117,7 @@ maps onto it unchanged.
 The handbook's rules are adopted literally and govern every sprint:
 
 - **Explore → Plan → Code → Commit.** No sprint starts without its slice of
-  `DESCREPENCIES.md` read and its acceptance criteria written down.
+  `DISCREPANCIES.md` read and its acceptance criteria written down.
 - **Small, shippable vertical slices.** Each sprint below ends with a runnable app and a
   commit. No sprint spans more than one architectural concern.
 - **Prompt with intent.** Every subagent gets testable acceptance criteria, not a vibe.
@@ -142,9 +142,9 @@ The handbook's rules are adopted literally and govern every sprint:
 - `CLAUDE.md` (at `jurisai_greenfield/CLAUDE.md`) is the shared context so agents don't
   re-derive conventions. It is updated at the end of each sprint, not during.
 
-### `DESCREPENCIES.md` — the open-issue register
+### `DISCREPANCIES.md` — the open-issue register
 
-Lives at `jurisai_greenfield/DESCREPENCIES.MD` (repo root once pushed) — already created;
+Lives at `jurisai_greenfield/DISCREPANCIES.MD` (repo root once pushed) — already created;
 seeded with the findings below as the first Sprint 0 commit. Frozen for the duration of a
 sprint: **no edits mid-sprint.** It is reconciled only at a sprint boundary, in one commit.
 
@@ -208,7 +208,7 @@ jurisai_greenfield/              # == repo root of github.com/innovator-sh/juris
 │   └── crosswalk/ipc_bns.csv   # reviewed section mapping, versioned
 ├── scripts/                    # ingest, seed, migrate, build-crosswalk
 ├── docs/decisions.md
-├── DESCREPENCIES.md
+├── DISCREPANCIES.md
 ├── CLAUDE.md
 ├── pyproject.toml              # deps + ruff + mypy + pytest config
 ├── Dockerfile                  # multi-stage, non-root
@@ -402,7 +402,7 @@ or `repealed`. Never present a section number without its act. The
 ## Sprints
 
 Each sprint is a branch, ends with `/code-review` on the diff, a human read, a commit, an
-ADR note, and a `DESCREPENCIES.md` reconciliation. **The app must run at the end of every sprint.**
+ADR note, and a `DISCREPANCIES.md` reconciliation. **The app must run at the end of every sprint.**
 
 ### Sprint 0 — Contain the breach, stand up the real repo
 
@@ -424,14 +424,14 @@ credentials are still real and still exposed on this machine, so they still get 
 3. Add `.gitignore` (`.venv/`, `__pycache__/`, `*.log`, `db/`, `.env`, `offload_weights/`).
 4. Create `.env.example` listing every config var by name, no values. New credentials
    (post-rotation) go only into a local `.env`, never into a tracked file.
-5. Copy `DESCREPENCIES.MD` content in (seeded from the appendix below) as the first commit.
+5. Copy `DISCREPANCIES.MD` content in (seeded from the appendix below) as the first commit.
 6. **Verify with `gitleaks detect` before the first push** — this repo has no history to
    worry about, but a clean first commit is the cheapest guarantee it stays that way.
 7. First push to `main` (or a `sprint-0` branch if you'd rather review before it lands
    on `main` — your call, flag which you prefer).
 
 **Exit criteria:** `github.com/innovator-sh/jurisai` contains `.gitignore`, `.env.example`,
-and a seeded `DESCREPENCIES.MD`; `gitleaks` clean; rotated credentials confirmed working;
+and a seeded `DISCREPANCIES.MD`; `gitleaks` clean; rotated credentials confirmed working;
 `jurisai/` (legacy) untouched on disk and never staged.
 
 ### Sprint 1 — Foundation: repo, deps, config, CI
@@ -614,7 +614,7 @@ a `<img src=x onerror=alert(1)>` answer renders as text; Lighthouse a11y ≥ 90.
 5. `README.md`: architecture diagram, setup, ingest, deploy, a **"How to add a corpus"**
    runbook (BNSS/BSA are the next candidates), corpus provenance table, the MVP-vs-funded
    stack table, and the disclaimer required by item 4.
-6. Final `DESCREPENCIES.md` reconciliation; everything `fixed` or `wontfix` with a reason.
+6. Final `DISCREPANCIES.md` reconciliation; everything `fixed` or `wontfix` with a reason.
 7. Update `CLAUDE.md` to the new structure.
 
 **Exit criteria:** a clean clone → `docker compose up` → working app, guided only by the
@@ -711,7 +711,7 @@ human read. End-to-end, before calling it done:
 - **Corpus drift.** BNS is new and will see corrections and amendments. `ingest_version` on
   chunks and on stored answers is what makes a re-ingest auditable; keep it populated.
 
-## Appendix — `DESCREPENCIES.md` seed (to be created in Sprint 0)
+## Appendix — `DISCREPANCIES.md` seed (to be created in Sprint 0)
 
 **S0 — exploitable:** hardcoded Atlas URI `app.py:25` · hardcoded Mistral key `app.py:39` ·
 committed Firebase key `register.js:10` · no authentication anywhere · IDOR on

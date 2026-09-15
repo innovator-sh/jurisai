@@ -1,4 +1,4 @@
-# DESCREPENCIES — open-issue register
+# DISCREPANCIES — open-issue register
 
 Seeded from the initial audit of the legacy prototype (`jurisai/`, untouched, read-only).
 All evidence paths point into that legacy tree unless noted otherwise.
