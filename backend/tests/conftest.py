@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 # import, so tests don't depend on a real .env existing.
 os.environ.setdefault("MONGO_URI", "mongodb://test-unused/jurisai")
 os.environ.setdefault("MISTRAL_API_KEY", "test-unused-key")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-not-for-production-only-32b")
 
 
 @pytest.fixture

@@ -13,8 +13,10 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** pre-Sprint-0. This directory holds the plan and this file; the
-application itself has not been built yet.
+**Current status:** Sprint 2 done (auth). Sprints 0-1 (repo, FastAPI port,
+packaging, CI, Docker) are merged to `main`. Next up: Sprint 3 (corpus
+registry, Qdrant, real LLM provider). See `docs/decisions.md` for what
+landed each sprint and why.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
@@ -48,15 +50,21 @@ reference material**:
 ## Repository target
 
 This directory's contents are the repository at **https://github.com/innovator-sh/jurisai**
-(`main` branch). As of the last check, that repo is empty except for an auto-generated
-`README.md` — there is no history to reconcile, so builds proceed straight onto `main`
-(or a `sprint-N` branch per the plan's sprint workflow).
+(`main` branch, private). PRs land on a `sprint-N` branch per the plan's sprint workflow;
+small non-sprint fixes commit directly to `main` rather than opening a PR.
 
 ## Build & run
 
-Not yet applicable — no code exists here yet. Once Sprint 1 lands, this section will
-document the real `pyproject.toml` / `docker compose up` workflow; do not write placeholder
-run instructions before then.
+```
+uv sync                          # installs backend/app's dependencies
+cp .env.example .env             # then fill in real values — see comments in the file
+docker compose up                # app + self-hosted Mongo + Qdrant (Qdrant unused until Sprint 3)
+```
+
+`uv run pytest -q` runs the test suite without needing Docker — Mongo and the vector
+store are mocked (`backend/tests/conftest.py`), so it doesn't need a real database or the
+~400MB embedding model. `uv run ruff check .` and `uv run mypy backend/app` are the other
+two local gates; all three also run in CI.
 
 ## Directory structure (target — see the plan for the full annotated tree)
 
@@ -86,6 +94,9 @@ jurisai_greenfield/
 - Every LLM call goes through the `LLMProvider` protocol in `llm/base.py` — never call
   Groq/Mistral SDKs directly from route code. `LLM_PROVIDER` in config picks the
   implementation (`groq` default for MVP).
+- Every protected route depends on `CurrentUser` (`app/core/security.py`) and every
+  `ChatRepository` query is scoped by `user_id` — never trust a client-supplied user id,
+  and never add a session/chat query that skips the `user_id` filter.
 - Frontend stays vanilla ES6 + Jinja (no framework), rendered with `textContent` /
   `DOMPurify` — never raw `innerHTML` on model or user-controlled content.
 - Logging via `structlog` to stdout, JSON — never write user query text to a local file.
