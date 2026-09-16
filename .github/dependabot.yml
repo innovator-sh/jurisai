@@ -1,0 +1,41 @@
+version: 2
+
+updates:
+  # Python deps (pyproject.toml / uv.lock)
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Being removed entirely in Sprint 3 (see docs/decisions.md) — no point
+      # reviewing bumps to a dependency that's about to be deleted.
+      - dependency-name: "langchain-community"
+      - dependency-name: "langchain-text-splitters"
+      # Large, breaking, infrequently-needed for this project's actual usage —
+      # review major bumps by hand rather than auto-PR them.
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "transformers"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "chromadb"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions versions used in ci.yml (actions/checkout, setup-uv,
+  # gitleaks-action) — supply-chain hygiene for the CI pipeline itself.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Dockerfile base image
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
