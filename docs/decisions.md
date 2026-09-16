@@ -58,3 +58,13 @@ startup still does both for real).
   in the plan (unlike the Chroma → Qdrant swap, which is tied to Sprint 3's
   corpus abstraction), so there was no reason to stand up Atlas first and
   tear it down later.
+
+**Not done: branch protection on `main`.** GitHub's branch protection (classic
+and the newer Rulesets) both require GitHub Pro on a private repo — free tier
+only allows either on a public repo. Both paths conflict with a standing
+decision: Pro is a paid tool we ruled out for the MVP, and public would expose
+the audit trail (60 findings, several still open) that we specifically moved
+to GitHub Issues to keep out of a future-public repo. Decision: skip
+GitHub-enforced protection for now, rely on always checking CI status before
+treating a PR as mergeable. Revisit once funded (Pro) or once the open
+findings are closed down enough that going public is fine either way.
