@@ -1,0 +1,33 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/jurisai
+      QDRANT_URL: http://qdrant:6333
+    volumes:
+      - ./data:/app/backend/data:ro
+      - chroma_db:/app/backend/db
+    depends_on:
+      - mongo
+      - qdrant
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+
+  # Not yet used by the app (wired up in Sprint 3) — present now so Sprint 3
+  # doesn't need to touch this file, per the plan's target compose shape.
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+volumes:
+  mongo_data:
+  qdrant_storage:
+  chroma_db:
