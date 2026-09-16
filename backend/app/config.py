@@ -10,13 +10,11 @@ class Settings(BaseSettings):
     # Required now
     mongo_uri: str
     mistral_api_key: str
+    jwt_secret_key: str
 
     # App
     log_level: str = "INFO"
     cors_origins: list[str] = ["http://localhost:8000"]
-
-    # Auth (Sprint 2)
-    jwt_secret_key: str = ""
 
     # Vector store (Sprint 3)
     qdrant_url: str = "http://qdrant:6333"

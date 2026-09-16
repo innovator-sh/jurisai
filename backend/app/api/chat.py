@@ -1,19 +1,20 @@
-"""Ported from jurisai/Backend/app.py (`/chat`, `get_answer`), relocated only.
+"""Ported from jurisai/Backend/app.py (`/chat`, `get_answer`).
 
-Preserved as-is, all tracked as open issues for later sprints:
-- D024: raw `Document` reprs interpolated into the prompt (Sprint 3).
+Now requires auth and scopes storage by user_id (D004-D008, closed) and rate
+limits per user (D015, closed). Still open, tracked for Sprint 3:
+- D024: raw `Document` reprs interpolated into the prompt.
 - D025: a Mistral error string gets stored and returned as if it were the
-  answer, instead of a typed error (Sprint 3).
-- D029: a Mongo write failure is silently swallowed (Sprint 3).
-- D015: no rate limiting on this route (Sprint 2).
-- No auth, no ownership on session_id (D004-D008, Sprint 2).
+  answer, instead of a typed error.
+- D029: a Mongo write failure is silently swallowed.
 """
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.core.logging import get_logger
+from app.core.rate_limit import limiter
+from app.core.security import CurrentUser
 from app.deps import ChatRepositoryDep, SettingsDep, VectorStoreDep
 from app.llm.mistral_client import query_mistral
 from app.models.chat import ChatRequest, ChatResponse
@@ -24,8 +25,11 @@ logger = get_logger(__name__)
 
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit("20/minute")
 def chat(
+    request: Request,
     body: ChatRequest,
+    user: CurrentUser,
     vector_store: VectorStoreDep,
     chat_repo: ChatRepositoryDep,
     settings: SettingsDep,
@@ -42,7 +46,7 @@ def chat(
     response = query_mistral(formatted_query, settings.mistral_api_key)
 
     try:
-        chat_repo.insert_turn(session_id, query, response)
+        chat_repo.insert_turn(user.id, session_id, query, response)
     except Exception as e:
         logger.error("failed_to_store_chat", session_id=session_id, error=str(e))
 

@@ -68,3 +68,53 @@ to GitHub Issues to keep out of a future-public repo. Decision: skip
 GitHub-enforced protection for now, rely on always checking CI status before
 treating a PR as mergeable. Revisit once funded (Pro) or once the open
 findings are closed down enough that going public is fine either way.
+
+## Sprint 2 — Authentication and authorization
+
+**What landed:** self-hosted JWT auth (argon2 password hashing, 15-minute
+access tokens returned in the response body, 7-day refresh tokens as an
+httpOnly/SameSite=strict cookie, tracked server-side by `jti` so logout can
+actually revoke one). `app/core/security.py`'s `current_user` dependency is a
+thin JWT-decode step specifically so a departmental OIDC/SSO provider can
+replace it later without touching any route. `/api/auth/{signup,login,
+refresh,logout,me}`, all four session routes and `/api/chat` now require it
+and scope every query by `user_id`. Rate limiting (`slowapi`, 20/min, keyed by
+user where a token is present, IP otherwise) on `/api/chat`. A minimal
+`login.html` — plain HTML/JS, `textContent` only, access token held in a JS
+variable (never `localStorage`) — replaces the legacy fake-submit page.
+
+**Closed this sprint:**
+- D004-D008 (no auth, no ownership anywhere) — every session route and
+  `/api/chat` now require a verified token, and `ChatRepository` filters by
+  `user_id` on every query, so a session that isn't yours matches nothing.
+  Verified by `test_user_cannot_touch_another_users_session`: a 404 (or an
+  empty list, for the GET routes) on all of history/session/rename/delete —
+  never a 403, which would itself confirm the session_id exists.
+- D015 (no rate limiting on the paid LLM route).
+- D019 (`login.html` fake `setTimeout` submit) — replaced with a real
+  signup/login flow against the new auth API.
+- D021 (`toggleForm()` TypeError on a removed field) — moot; the rewritten
+  page has no such field to remove.
+
+**Still open, not this sprint's job:**
+- D014, D026, D028 — same as Sprint 1's note; still Sprint 4.
+- D024, D025, D029 — still Sprint 3.
+
+**Scope decisions:**
+- **No separate `/account` page.** The plan's item 5 asks for one "showing
+  real data" — the point being to prove auth actually gates something and
+  displays real user state end-to-end, not the page itself. `GET /api/auth/me`
+  plus `login.html` rendering "Signed in as {email}" after a real login
+  already demonstrates that; a dedicated `/account` page with real settings
+  is Sprint 5 work once there's an actual account to manage.
+- **No automatic access-token refresh loop in `login.html`.** There's nothing
+  yet that needs a session to stay alive past login (no chat UI exists until
+  Sprint 5) — `/api/auth/refresh` exists and is tested, but wiring a
+  refresh-before-expiry timer into a page with nothing to keep logged into
+  would be speculative.
+- **Phone-OTP signup is still out of scope**, per the plan's MVP note (Indian
+  DLT SMS registration is a funded-phase cost) — email/password only.
+- **CORS is untouched (still wildcard, D013).** Cookie-based refresh works
+  fine same-origin, which is what exists until Sprint 5 introduces a real
+  frontend origin — this sprint didn't need to touch it.
+findings are closed down enough that going public is fine either way.
