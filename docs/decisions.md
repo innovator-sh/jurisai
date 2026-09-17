@@ -3,6 +3,20 @@
 ADR-style notes, one per sprint, per the plan's working method. Short — the
 "why," not a changelog (that's what `git log` is for).
 
+## Dependabot alerts #1-4 (chromadb) — assessed, not actioned
+
+All four are ChromaDB's HTTP-server-mode vulnerabilities (GHSA-f4j7-r4q5-qw2c,
+-2wm9-hf6c-p5cr, -xph7-9rjv-w5fr, -36p7-vc44-83pf) — pre/post-auth code
+injection and tenant-isolation bugs in the `/api/v2/tenants/.../collections`
+endpoints, reachable only via `chromadb.HttpClient`/`chroma run`. This app
+uses `langchain_community.vectorstores.Chroma` in embedded/persistent mode —
+no HTTP server, no network listener, none of those endpoints exist in this
+deployment. No patched version exists for any of them yet regardless. Left
+open rather than dismissed (dismissing would overstate confidence given
+there's no patch to verify against) — Sprint 3's planned Chroma → Qdrant
+swap removes the dependency entirely, which resolves these as a side effect
+rather than a targeted fix.
+
 ## Sprint 1 — Foundation: repo, deps, config, CI
 
 **What landed:** `jurisai/Backend/app.py` ported module-by-module into
