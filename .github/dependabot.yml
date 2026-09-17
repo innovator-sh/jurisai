@@ -27,15 +27,26 @@ updates:
 
   # GitHub Actions versions used in ci.yml (actions/checkout, setup-uv,
   # gitleaks-action) — supply-chain hygiene for the CI pipeline itself.
+  # Majors excluded: CI going green only proves the workflow still runs, not
+  # that a major version is safe — review those by hand.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
-  # Dockerfile base image
+  # Dockerfile base image. Majors excluded — pyproject.toml pins
+  # requires-python = ">=3.12", and ML wheels (torch, sentence-transformers)
+  # are typically slow to support a new CPython version; a base-image major
+  # bump needs deliberate testing, not an auto-PR.
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
