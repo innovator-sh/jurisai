@@ -4,6 +4,20 @@ under load."""
 
 from unittest.mock import patch
 
+from app.rag.retriever import RetrievedChunk
+
+FAKE_CHUNKS = [
+    RetrievedChunk(
+        text="Whoever commits theft shall be punished...",
+        act="Indian Penal Code, 1860",
+        section="379",
+        section_title="Punishment for theft",
+        page=1409,
+        score=0.7,
+        ingest_version="test",
+    )
+]
+
 
 def signup(client, email: str, password: str = "correct-horse-battery") -> str:
     res = client.post("/api/auth/signup", json={"email": email, "password": password})
@@ -50,7 +64,7 @@ def test_user_cannot_touch_another_users_session(client):
     token_a = signup(client, "userA@example.com")
     token_b = signup(client, "userB@example.com")
 
-    with patch("app.api.chat.query_mistral", return_value="a canned answer"):
+    with patch("app.api.chat.retrieve", return_value=FAKE_CHUNKS):
         chat_res = client.post(
             "/api/chat", json={"query": "what is theft?"}, headers=auth_headers(token_a)
         )
@@ -84,7 +98,7 @@ def test_user_cannot_touch_another_users_session(client):
 
 def test_chat_rate_limit_trips(client):
     token = signup(client, "burst@example.com")
-    with patch("app.api.chat.query_mistral", return_value="a canned answer"):
+    with patch("app.api.chat.retrieve", return_value=FAKE_CHUNKS):
         statuses = [
             client.post(
                 "/api/chat", json={"query": f"q{i}"}, headers=auth_headers(token)

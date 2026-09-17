@@ -15,7 +15,6 @@ venv/
 logs/
 
 # Local data stores (self-hosted Mongo/Qdrant volumes)
-db/
 qdrant_storage/
 mongo_data/
 offload_weights/

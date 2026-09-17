@@ -1,0 +1,48 @@
+# ~20 questions with known-correct expected IPC sections, used to measure
+# retrieval-hit-rate (item 10 of Sprint 3). Deliberately smaller than the
+# "~30" in the plan and restricted to well-established, high-confidence
+# sections — see docs/decisions.md for why: getting an *expected answer*
+# wrong in a legal-tool's own eval set is its own correctness risk, and the
+# sections excluded by chunking.py's confidence threshold (107, 108, 109,
+# 121, 375, 376, 464) obviously can't be tested here either.
+questions:
+  - query: "What is the punishment for murder?"
+    expected_section: "302"
+  - query: "What is the punishment for culpable homicide not amounting to murder?"
+    expected_section: "304"
+  - query: "What is the punishment for attempt to murder?"
+    expected_section: "307"
+  - query: "What is the punishment for voluntarily causing hurt?"
+    expected_section: "323"
+  - query: "What is the punishment for voluntarily causing grievous hurt?"
+    expected_section: "325"
+  - query: "What is the punishment for wrongful restraint?"
+    expected_section: "341"
+  - query: "What is the punishment for wrongful confinement?"
+    expected_section: "342"
+  - query: "What is the definition of theft under the IPC?"
+    expected_section: "378"
+  - query: "What is the punishment for theft?"
+    expected_section: "379"
+  - query: "What is the punishment for theft in a dwelling house?"
+    expected_section: "380"
+  - query: "What is the punishment for robbery?"
+    expected_section: "392"
+  - query: "What is the punishment for criminal breach of trust?"
+    expected_section: "406"
+  - query: "What is cheating under the IPC?"
+    expected_section: "415"
+  - query: "What is the punishment for cheating and dishonestly inducing delivery of property?"
+    expected_section: "420"
+  - query: "What is the punishment for mischief?"
+    expected_section: "426"
+  - query: "What is the punishment for criminal trespass?"
+    expected_section: "447"
+  - query: "What is defamation under the IPC?"
+    expected_section: "499"
+  - query: "What is the punishment for defamation?"
+    expected_section: "500"
+  - query: "What is common intention under the IPC?"
+    expected_section: "34"
+  - query: "What is the punishment for criminal conspiracy?"
+    expected_section: "120B"

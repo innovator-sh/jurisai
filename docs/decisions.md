@@ -131,4 +131,82 @@ variable (never `localStorage`) — replaces the legacy fake-submit page.
 - **CORS is untouched (still wildcard, D013).** Cookie-based refresh works
   fine same-origin, which is what exists until Sprint 5 introduces a real
   frontend origin — this sprint didn't need to touch it.
-findings are closed down enough that going public is fine either way.
+
+## Sprint 3 — RAG correctness, corpus abstraction, and the LLM layer
+
+**What landed:** `corpora/registry.py` + `definitions.yaml` (ipc enabled, bns
+declared but not built); LangChain and Chroma removed entirely in favour of
+direct clients (`qdrant-client`, `sentence-transformers`, `pypdf`); a
+section-aware chunker built and validated against the *real* source PDF
+rather than assumed (see below); `rag/router.py` implementing the plan's
+full 4-rule precedence, tested against a registry with both corpora enabled
+since the real one only has ipc; `rag/prompts.py` (system/context/user
+separation, with a `build_hybrid_context` seam for Sprint 3B); the
+`LLMProvider` protocol with Groq (default) and Mistral (alternate)
+implementations — both verified against the actual installed SDKs' real
+APIs, not assumed from memory — plus Anthropic/Bedrock stubs; a
+self-contained retrieval-hit-rate eval harness (`scripts/eval.py`).
+
+**The source PDF is not a bare-act text.** It's a ~1,870-page annotated
+commentary edition (statute text interleaved with case law, footnotes, and
+`[s N]` cross-references) — discovered by inspecting it before writing a
+parser, not by assuming its shape. That inspection caught three real bugs
+before they shipped, each verified against known sections (302, 379, 420,
+34, 149, 300, 499, ...) before trusting the parser:
+1. The `[s N]` marker also appears inline inside footnotes quoting
+   superseded law (a footnote on section 375 recites the pre-2013 wording,
+   complete with its own `[s 375]` tag) — a naive first-match search would
+   have retrieved repealed text as current law. Fixed by requiring a
+   genuine heading to start a line (optionally after a footnote-number
+   artifact like section 34's actual `170.[[s 34]`).
+2. Titles that wrap across two lines (e.g. section 149) were truncated by
+   an end-of-line assumption, corrupting the body text with a leftover
+   title fragment. Fixed by accumulating text to the first `.`/em-dash
+   wherever it falls, not at end-of-line.
+3. Seven heavily-amended sections (107, 108, 109, 121, 375, 376, 464) don't
+   have a detectable "COMMENT" boundary or matching next-heading in this
+   format, so extraction ran on and swallowed a neighbouring section's text
+   (content that is actually section 376 turned up labelled 375). Rather
+   than ingest unverified, possibly-mislabelled content, sections whose raw
+   block exceeds 10,000 chars are excluded and logged — chosen because
+   there's a clean gap in the length distribution between the longest
+   confirmed-correct section (8,637 chars, defamation's ten exceptions,
+   verified to end correctly) and the shortest confirmed-contaminated one
+   (13,058 chars). `scripts/ingest.py` prints exactly which sections were
+   skipped on every run.
+
+**Retrieval threshold calibrated on real data, not guessed.** Ran a real
+ingest + query test before picking `RETRIEVAL_SCORE_THRESHOLD`: relevant
+queries scored 0.58-0.70 (cosine similarity), a clearly off-topic control
+query ("how do I bake a chocolate cake?") topped out at 0.29 — a clean
+separation, with the chosen default of 0.5 sitting in the gap.
+
+**Eval harness baseline: 18/20 (90%) hit-rate** on IPC (`backend/tests/eval/
+ipc_questions.yaml`, run via `scripts/eval.py --corpus ipc`, self-contained
+against an in-memory Qdrant so it needs no live service). Both misses are
+semantic near-confusions with adjacent sections in the same chapter, not
+wild errors: "voluntarily causing hurt" (323) retrieved 322/334/325, all
+closely related hurt-family offences; "theft in a dwelling house" (380)
+retrieved trespass-adjacent sections (451/450) instead. Recorded as the
+honest baseline the exit criteria asks for, not tuned toward 100% on a
+20-question set that would just be overfitting to it.
+
+**Not done, tracked open:**
+- **D056/D057 (multilingual + hybrid dense/sparse embeddings)** — still
+  English-only `multi-qa-mpnet-base-dot-v1`, dense-only. The BGE-M3 swap
+  needs a ~2GB model download and the `FlagEmbedding` package for its
+  sparse output, neither of which this sprint's time budget covered testing
+  properly. Deliberately deferred, not silently dropped.
+- **Streaming.** `LLMProvider` only has `complete()` — no route consumes
+  SSE until Sprint 5 rebuilds the frontend, so `stream()` isn't on the
+  protocol yet; adding it when something actually calls it avoids dead code.
+- **Hybrid retrieval across corpora** is Sprint 3B's job by design — the
+  router already returns `needs_clarification` rather than guessing when
+  more than one corpus is enabled with no date/citation to disambiguate.
+
+**Scope decision:** an offence date after 1 Jul 2024 correctly returns
+"needs clarification" today, not a forced IPC answer — "the router always
+resolves to ipc for now" (the plan's phrasing) describes the *default*
+case, not one where applying IPC would be a real legal-correctness error.
+Silently answering a post-cutover query under superseded law would be
+worse than asking.

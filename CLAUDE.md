@@ -13,10 +13,13 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** Sprint 2 done (auth). Sprints 0-1 (repo, FastAPI port,
-packaging, CI, Docker) are merged to `main`. Next up: Sprint 3 (corpus
-registry, Qdrant, real LLM provider). See `docs/decisions.md` for what
-landed each sprint and why.
+**Current status:** Sprint 3 done (corpus registry, Qdrant, real LLM
+providers). Sprints 0-2 (repo, FastAPI port, packaging, CI, Docker, auth)
+are merged to `main`. Next up: Sprint 3B (BNS onboarding, whenever source
+text is ready) or Sprint 4 (API hardening). See `docs/decisions.md` for
+what landed each sprint and why — Sprint 3's entry in particular documents
+real bugs found by testing the section parser against the actual source
+PDF, worth reading before touching `rag/chunking.py`.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
@@ -58,13 +61,17 @@ small non-sprint fixes commit directly to `main` rather than opening a PR.
 ```
 uv sync                          # installs backend/app's dependencies
 cp .env.example .env             # then fill in real values — see comments in the file
-docker compose up                # app + self-hosted Mongo + Qdrant (Qdrant unused until Sprint 3)
+docker compose up                # app + self-hosted Mongo + Qdrant
+python scripts/ingest.py --corpus ipc   # builds the Qdrant index (once, or after data/ipc/ changes)
 ```
 
-`uv run pytest -q` runs the test suite without needing Docker — Mongo and the vector
-store are mocked (`backend/tests/conftest.py`), so it doesn't need a real database or the
-~400MB embedding model. `uv run ruff check .` and `uv run mypy backend/app` are the other
-two local gates; all three also run in CI.
+`uv run pytest -q` runs the test suite without needing Docker — Mongo, Qdrant, and the
+LLM provider are all mocked (`backend/tests/conftest.py`), so it doesn't need a real
+database, a running Qdrant, or the ~400MB embedding model. `uv run ruff check .` and
+`uv run mypy backend/app` are the other two local gates; all three also run in CI.
+`python scripts/eval.py --corpus ipc` runs the retrieval-hit-rate report — self-contained
+against an in-memory Qdrant, so it doesn't need `docker compose up` either, but it does
+download the real embedding model and parse the real PDF, so it's slow (a minute or two).
 
 ## Directory structure (target — see the plan for the full annotated tree)
 
@@ -75,7 +82,7 @@ jurisai_greenfield/
 ├── backend/static/         # CSS/JS
 ├── backend/tests/
 ├── data/                   # ipc/, bns/, crosswalk/ (LFS)
-├── scripts/                # ingest, seed, migrate, build-crosswalk
+├── scripts/                # ingest.py, eval.py, seed, migrate, build-crosswalk (later)
 ├── docs/decisions.md       # ADR-style notes, one per sprint
 ├── docs/production-hardening-plan.md
 ├── DISCREPANCIES.MD        # pointer only — issues tracked in the repo's Issues tab
