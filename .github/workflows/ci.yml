@@ -54,10 +54,14 @@ jobs:
         run: docker build -t jurisai:ci .
 
   eval:
-    # Non-blocking retrieval-quality report (plan item Sprint 3.10) — not a
-    # merge gate. Self-contained against an in-memory Qdrant, but needs the
-    # real IPC PDF (via LFS) and the real embedding model, so it's slow.
+    # Non-blocking retrieval-quality report (plan item Sprint 3.10, extended
+    # for BNS in Sprint 3B) — not a merge gate. Self-contained against an
+    # in-memory Qdrant per corpus, but needs the real source PDFs (via LFS)
+    # and the real embedding model, so it's slow.
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        corpus: [ipc, bns]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,5 +76,5 @@ jobs:
         run: uv sync --all-extras
 
       - name: Retrieval-hit-rate eval
-        run: uv run python scripts/eval.py --corpus ipc
+        run: uv run python scripts/eval.py --corpus ${{ matrix.corpus }}
         continue-on-error: true

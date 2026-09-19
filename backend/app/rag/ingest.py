@@ -17,11 +17,19 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from app.core.logging import get_logger
+from app.corpora.loaders import bns_bare_act, ipc_commentary
 from app.corpora.registry import Corpus, load_registry
-from app.rag.chunking import chunk_sections, extract_sections
+from app.rag.chunking import chunk_sections
 from app.rag.embeddings import VECTOR_SIZE, embed_texts
 
 logger = get_logger(__name__)
+
+# Dispatched by the registry's `loader` field — see corpora/definitions.yaml
+# and corpora/loaders/__init__.py for why each corpus needs its own.
+LOADERS = {
+    "ipc_commentary": ipc_commentary.extract_sections,
+    "bns_bare_act": bns_bare_act.extract_sections,
+}
 
 
 def _load_pdf_pages(pdf_path: Path) -> list[str]:
@@ -34,6 +42,14 @@ def ingest_corpus(corpus: Corpus, qdrant: QdrantClient) -> dict[str, object]:
     pdfs = sorted(source_dir.glob("*.pdf"))
     if not pdfs:
         raise FileNotFoundError(f"No PDFs found in {source_dir} for corpus {corpus.id!r}")
+
+    try:
+        extract_sections = LOADERS[corpus.loader]
+    except KeyError as e:
+        raise ValueError(
+            f"Corpus {corpus.id!r} declares loader {corpus.loader!r}, which isn't "
+            f"registered in rag/ingest.py's LOADERS dict"
+        ) from e
 
     ingest_version = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     all_chunks = []
@@ -120,7 +136,10 @@ def main() -> None:
     result = ingest_corpus(corpus, qdrant)
     print(f"Ingested {result['chunk_count']} chunks for corpus '{result['corpus']}'.")
     if result["skipped_sections"]:
-        print(f"Skipped (parser low-confidence, see rag/chunking.py): {result['skipped_sections']}")
+        print(
+            f"Skipped (parser low-confidence, see corpora/loaders/): "
+            f"{result['skipped_sections']}"
+        )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,10 @@
 
 No route, prompt, or retriever should ever hardcode a corpus id like "ipc" or
 "bns"; everything resolves through `Corpus` objects loaded here from
-`definitions.yaml`. Adding BNSS or BSA later is a YAML entry, not a code change.
+`definitions.yaml`. Adding BNSS or BSA later is a YAML entry plus, if its
+source document uses yet another format, a new module in `corpora/loaders/`
+(see `loader`, dispatched by name in `rag/ingest.py`) — never a change to
+any route, prompt, or retriever.
 """
 
 from dataclasses import dataclass
@@ -26,6 +29,7 @@ class Corpus:
     source: str
     collection: str
     enabled: bool
+    loader: str
     superseded_by: str | None = None
     supersedes: str | None = None
 
@@ -70,6 +74,7 @@ def _parse_corpus(raw: dict[str, Any]) -> Corpus:
         source=raw["source"],
         collection=raw["collection"],
         enabled=raw["enabled"],
+        loader=raw["loader"],
         superseded_by=raw.get("superseded_by"),
         supersedes=raw.get("supersedes"),
     )

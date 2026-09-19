@@ -13,13 +13,17 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** Sprint 3 done (corpus registry, Qdrant, real LLM
-providers). Sprints 0-2 (repo, FastAPI port, packaging, CI, Docker, auth)
-are merged to `main`. Next up: Sprint 3B (BNS onboarding, whenever source
-text is ready) or Sprint 4 (API hardening). See `docs/decisions.md` for
-what landed each sprint and why — Sprint 3's entry in particular documents
-real bugs found by testing the section parser against the actual source
-PDF, worth reading before touching `rag/chunking.py`.
+**Current status:** Sprint 3B done — BNS is a second live, enabled corpus
+(`corpora/loaders/bns_bare_act.py`), hybrid retrieval across both corpora
+works, and a draft (unreviewed) IPC↔BNS crosswalk exists at
+`data/crosswalk/ipc_bns.csv`. Sprints 0-3 are merged to `main`. Next up:
+**human review of the crosswalk** (blocking before any crosswalk-backed
+claim reaches a live answer — see `docs/decisions.md`'s Sprint 3B entry and
+`scripts/build_crosswalk.py`'s docstring for exactly what needs checking),
+or Sprint 4 (API hardening) in parallel. See `docs/decisions.md` for what
+landed each sprint and why — the Sprint 3 and 3B entries both document real
+bugs found by testing each source-format parser against the actual PDFs,
+worth reading before touching anything in `corpora/loaders/`.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
@@ -62,16 +66,18 @@ small non-sprint fixes commit directly to `main` rather than opening a PR.
 uv sync                          # installs backend/app's dependencies
 cp .env.example .env             # then fill in real values — see comments in the file
 docker compose up                # app + self-hosted Mongo + Qdrant
-python scripts/ingest.py --corpus ipc   # builds the Qdrant index (once, or after data/ipc/ changes)
+python scripts/ingest.py --corpus ipc   # builds the Qdrant index for one corpus
+python scripts/ingest.py --corpus bns   # (re-run after data/ipc/ or data/bns/ changes)
 ```
 
 `uv run pytest -q` runs the test suite without needing Docker — Mongo, Qdrant, and the
 LLM provider are all mocked (`backend/tests/conftest.py`), so it doesn't need a real
 database, a running Qdrant, or the ~400MB embedding model. `uv run ruff check .` and
 `uv run mypy backend/app` are the other two local gates; all three also run in CI.
-`python scripts/eval.py --corpus ipc` runs the retrieval-hit-rate report — self-contained
-against an in-memory Qdrant, so it doesn't need `docker compose up` either, but it does
-download the real embedding model and parse the real PDF, so it's slow (a minute or two).
+`python scripts/eval.py --corpus ipc` (or `--corpus bns`) runs the retrieval-hit-rate
+report — self-contained against an in-memory Qdrant, so it doesn't need `docker compose up`
+either, but it does download the real embedding model and parse the real PDF, so it's slow
+(a minute or two per corpus).
 
 ## Directory structure (target — see the plan for the full annotated tree)
 
@@ -81,8 +87,8 @@ jurisai_greenfield/
 ├── backend/templates/      # Jinja, base.html + extends
 ├── backend/static/         # CSS/JS
 ├── backend/tests/
-├── data/                   # ipc/, bns/, crosswalk/ (LFS)
-├── scripts/                # ingest.py, eval.py, seed, migrate, build-crosswalk (later)
+├── data/                   # ipc/, bns/ (LFS); crosswalk/ipc_bns.csv (plain text, human-reviewed by hand)
+├── scripts/                # ingest.py, eval.py, build_crosswalk.py, seed/migrate (later)
 ├── docs/decisions.md       # ADR-style notes, one per sprint
 ├── docs/production-hardening-plan.md
 ├── DISCREPANCIES.MD        # pointer only — issues tracked in the repo's Issues tab
@@ -98,6 +104,16 @@ jurisai_greenfield/
   `except:`, no `str(e)` returned to a client — see `core/errors.py` in the plan.
 - Every corpus reference goes through the `corpora/registry.py` abstraction — never a
   literal `"ipc"` or `"bns"` string outside `corpora/definitions.yaml`.
+- A source document gets its own module in `corpora/loaders/`, dispatched by the
+  registry's `loader` field — never assume two statutes share a parser. Confirmed
+  necessary, not theoretical: the IPC and BNS loaders find zero sections in each
+  other's source PDF.
+- **Never let an unreviewed `data/crosswalk/*.csv` row reach a live answer.**
+  `corpora/crosswalk.py` loads whatever the CSV says without judging it — the
+  `confidence` column is what tracks review status, set by a human, not this code.
+  Wiring a crosswalk assertion into a prompt while its row is still `unreviewed` is
+  the exact "hallucinated section mapping" failure the plan calls the worst one this
+  product can have.
 - Every LLM call goes through the `LLMProvider` protocol in `llm/base.py` — never call
   Groq/Mistral SDKs directly from route code. `LLM_PROVIDER` in config picks the
   implementation (`groq` default for MVP).

@@ -210,3 +210,137 @@ resolves to ipc for now" (the plan's phrasing) describes the *default*
 case, not one where applying IPC would be a real legal-correctness error.
 Silently answering a post-cutover query under superseded law would be
 worse than asking.
+
+## Sprint 3B — Onboard BNS and the hybrid model
+
+**Source:** NCRB's published BNS bare-act PDF (`data/bns/bns-data.pdf`,
+sha256 `a83f12a93e32c9e0b39a85f75850a448dc4682b1b44b2d6bd680165bb9931549`,
+retrieved 2026-09-18), chosen over the MHA Gazette copy (also downloaded and
+compared) because NCRB's includes both a clean section-title index and the
+official IPC↔BNS "Corresponding Section Table" in one document — the MHA
+Gazette has neither. India Code's canonical copy (`a2023-45.pdf`) 302-redirects
+to an HTML wall and isn't scriptable; worth citing as the canonical reference
+even though NCRB's copy is what's actually ingested. Section count verified
+against public sources (358) before trusting the extraction: exact match.
+
+**New loader architecture: `corpora/loaders/`.** Confirmed, not assumed,
+that BNS needs a different parser: running the IPC loader's `[s N]` pattern
+against the BNS PDF finds zero sections, and vice versa — these are
+different document formats, not different dialects of one format. `Corpus`
+gained a `loader` field (`ipc_commentary` / `bns_bare_act`), dispatched by
+name in `rag/ingest.py`'s `LOADERS` dict, matching the plan's original
+"per-format loaders" design more literally than Sprint 3's single-format
+`rag/chunking.py` needed to.
+
+**`bns_bare_act.py` — genuinely a bare act, no case-law commentary
+interleaved**, unlike IPC's source. All 358 sections extracted with zero
+exclusions needed (versus IPC's 7 low-confidence exclusions) — a real
+structural difference between the two documents, not a quality gap in this
+parser. Three bugs caught by testing against known sections (63, 103, 129,
+144, 154, 303, 318, ...) before trusting it:
+1. The marginal title for a section sits on its own line *immediately
+   before* the number, not just in the arrangement-of-sections index — and
+   a handful of these lines have a single stray leading space ("Criminal
+   force. \n 129. Whoever...", confirmed to be a PDF-extraction artifact,
+   not a real second markup convention).
+2. Titles wrap across two lines, same class of bug as the IPC loader, but
+   discovered from the opposite direction: because the title sits *before*
+   its own number here, the fix also has to trim the *previous* section's
+   body, which was otherwise running on to swallow the next section's
+   title (found on section 2, which was absorbing "General explanations."
+   — section 3's title — at its tail).
+3. Chapter headings ("CHAPTER II") and Title-Case sub-chapter group
+   headings ("Of Theft", "Of sexual offences") both sit between sections
+   and must not be swept into a title — missing the Title-Case form first
+   produced "Of sexual offences Rape." for section 63.
+
+**Hybrid retrieval and the answer contract landed as part of this sprint,
+not Sprint 3.** Sprint 3's router already had a "default: hybrid" branch in
+the precedence rules, but it was never actually reachable — only one
+corpus was ever enabled, so every path collapsed to it, and the branch
+returned `needs_clarification` instead of a real hybrid result (a mistake
+in the original implementation, not a deliberate deferral — caught only
+once bns was actually enabled and the branch ran for real). Fixed:
+`RoutingResult` now carries `corpora: list[Corpus]` (primary/superseding
+corpus first — a corpus with `supersedes` set is definitionally current
+law, so this doesn't hardcode "bns"), `/api/chat` retrieves from every
+corpus in that list and builds a combined context, and
+`build_hybrid_system_prompt` implements the plan's answer contract
+structure (current position first, earlier-act counterpart second, explicit
+note on new/changed provisions) — though without automated crosswalk-backed
+relation flags yet, since the crosswalk itself is unreviewed (see below).
+
+**The crosswalk (`data/crosswalk/ipc_bns.csv`, `scripts/build_crosswalk.py`)
+is a draft scaffold for human review, not reviewed data — every one of its
+377 rows is `confidence=unreviewed`, and nothing in the app consults it for
+live answers.** This was, by a wide margin, the hardest parsing problem
+this project has hit: NCRB's "Corresponding Section Table" is a two-column
+layout that pypdf extracts inconsistently — sometimes each cell lands on
+its own line, sometimes both cells' content is glued onto one line when
+short ("Punishments.  53. Punishments."). Both the BNS and IPC columns use
+the identical "N. Title." lexical pattern with no positional signal to
+tell them apart from text alone. What the build script actually does,
+adopted after three earlier approaches failed in testing:
+- Row boundaries are found using the **already-verified, ordered list of
+  real BNS section numbers** (from `bns_bare_act`'s own extraction) as
+  ground truth, not a numeric-ascending heuristic — IPC numbers ascend
+  within their own chapters too, so "ascending" alone can't tell the
+  columns apart. A lookahead-and-resync step (search up to 6 entries ahead
+  in the known sequence, not just the immediate next one) was necessary
+  because a single missed match anywhere in the ~55-page table otherwise
+  desyncs every row after it — confirmed by watching the row count jump
+  from 316 to 352 (of 356 possible) once this was added.
+- BNS sections 2 (Definitions) and 3 (General explanations) are excluded
+  entirely. Their table entries are bracketed sub-clauses ("2(1)", "2(2)",
+  ...) with no period, which don't fit the row-boundary pattern and
+  corrupted grouping when included — and they're term definitions, not
+  offences, which is what this crosswalk is actually for.
+- Titles are **not** taken from the table's own (unreliably-interleaved)
+  text at all. Each row's title is looked up from the same
+  already-validated `ipc_commentary`/`bns_bare_act` extractions that build
+  the retrieval index — so a crosswalk title is only ever as trustworthy as
+  data already proven correct elsewhere, never a second unverified source.
+- `relation: repealed_candidate` is inferred **indirectly**: any IPC
+  section the loader extracted that never appears in any row's mapping is
+  flagged as a candidate, rather than parsing the table's "Deleted" marker
+  directly (instances of it weren't reliably distinguishable from
+  surrounding noise in testing). This can't tell a genuine repeal apart
+  from a row this script simply missed — the resulting list is
+  qualitatively sensible (many flagged sections literally say "[Repealed]"
+  or "[Omitted]" in their own IPC text, e.g. the Thuggee provisions and
+  attempted suicide) but is exactly the kind of ambiguity a human review
+  is for, not a claim this script is making.
+- Result: 352 of 356 in-scope BNS sections mapped (4 — sections 6, 7, 9,
+  319 — never matched; investigate those four specifically during review),
+  plus 25 repeal candidates. Relation counts: 276 renumbered, 61 merged, 15
+  new, 25 repealed_candidate.
+
+**Not done — deliberately, pending the crosswalk's human review:**
+- No crosswalk-backed relation flags in live answers. Wiring "this
+  provision was `modified`/`new`" into the hybrid prompt from unreviewed
+  data would be exactly the "hallucinated section mapping" failure mode the
+  plan calls the worst one this product can have — the loader
+  (`corpora/crosswalk.py`) exists and is tested, but nothing calls it from
+  `api/chat.py` yet.
+- No UI corpus selector, no FIR-form registry wiring (plan items 6-7) —
+  same reasoning as every prior sprint: no frontend exists beyond
+  `login.html` until Sprint 5, and building a selector for a page that
+  doesn't exist would be speculative. `containsIPC()` in the legacy
+  `index.js` was never going to be touched either way (legacy tree is
+  read-only) — D039 is closed anyway, because corpus detection is now
+  genuinely server-side in `rag/router.py`, which is the substance of what
+  that issue asked for.
+- Crosswalk questions in the eval set (plan item 8's "~15 crosswalk
+  questions") are deferred until the crosswalk itself is reviewed — an
+  eval question whose expected answer comes from unreviewed data would be
+  testing against a source no more trustworthy than what it's grading.
+
+**Eval baselines, both run for real (not estimated), both reproduced
+identically when re-run:**
+- IPC: 18/20 (90%), unchanged from Sprint 3.
+- BNS: 12/14 (86%). Both misses are the same *kind* of miss seen in IPC's
+  eval — semantic confusion with an adjacent section in the same chapter
+  (hurt-family offences, 117/118/122) and one weak-recall miss on a
+  deliberately generic query ("general definitions") against section 2's
+  sub-split chunks. No new failure category; not tuned toward 100% on a
+  14-question set.

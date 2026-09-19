@@ -6,9 +6,9 @@ from pydantic import BaseModel
 class ChatRequest(BaseModel):
     query: str
     session_id: str | None = None
-    # Corpus routing (Sprint 3's router.py); today only "ipc" is enabled, so
-    # every value other than an explicit unrecognised one collapses to it —
-    # see the plan's Query routing precedence.
+    # Corpus routing (rag/router.py) — see the plan's Query routing
+    # precedence. corpus_mode="ipc"/"bns" pins one explicitly; omitted with
+    # no offence_date and no in-query citation defaults to hybrid (both).
     corpus_mode: str | None = None
     offence_date: date | None = None
 
@@ -16,8 +16,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     session_id: str
-    corpus: str
-    act: str
+    corpus: str  # a corpus id, or "hybrid" when more than one was used
+    acts: list[str]  # every act actually cited from, primary corpus first
 
 
 class SessionSummary(BaseModel):

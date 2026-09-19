@@ -1,15 +1,11 @@
 """Ported from jurisai/Backend/app.py (`/chat`, `get_answer`), rebuilt on
-top of Sprint 3's corpus registry, Qdrant retriever, and LLMProvider.
+top of the corpus registry, Qdrant retriever, LLMProvider, and — as of
+Sprint 3B — hybrid retrieval across both ipc and bns.
 
-Closes this sprint:
-- D024: chunk text is formatted directly, not a raw Document repr.
-- D025: a provider failure raises LLMError -> 502, never gets stored or
-  returned as if it were a legal answer.
-- D031: a score threshold means "I don't have that in the {act}" instead of
-  always returning the top-k regardless of relevance.
-- D034/D035/D036/D037/D040: corpus is resolved through the registry, chunks
-  carry act/section metadata, the prompt names the act, sessions carry
-  corpus + ingest_version.
+Closes from Sprint 3: D024, D025, D031, D034/D035/D036/D037/D040 (see that
+sprint's docs/decisions.md entry). Sprint 3B additionally wires the router's
+hybrid default (previously unreachable — Sprint 3 only ever had one corpus
+enabled) into an actual multi-corpus retrieval + answer contract.
 
 Still open, Sprint 4: D014 (exception detail reaches the client), D029
 (chat-persistence failure is only logged, not surfaced).
@@ -25,8 +21,14 @@ from app.core.security import CurrentUser
 from app.deps import ChatRepositoryDep, CorpusRegistryDep, LLMProviderDep, QdrantDep, SettingsDep
 from app.llm.base import LLMError
 from app.models.chat import ChatRequest, ChatResponse
-from app.rag.prompts import build_context_block, build_system_prompt, build_user_message
-from app.rag.retriever import retrieve
+from app.rag.prompts import (
+    build_context_block,
+    build_hybrid_context,
+    build_hybrid_system_prompt,
+    build_system_prompt,
+    build_user_message,
+)
+from app.rag.retriever import RetrievedChunk, retrieve
 from app.rag.router import resolve_corpus
 
 router = APIRouter()
@@ -55,36 +57,54 @@ async def chat(
     routing = resolve_corpus(
         registry, query, explicit_selection=body.corpus_mode, offence_date=body.offence_date
     )
-    if routing.corpus is None:
+    if not routing.corpora:
         raise HTTPException(status_code=422, detail=routing.reason or "Could not resolve a corpus")
-    corpus = routing.corpus
 
-    chunks = retrieve(
-        qdrant,
-        corpus,
-        query,
-        k=settings.retrieval_k,
-        score_threshold=settings.retrieval_score_threshold,
-    )
-    if not chunks:
-        answer = f"I don't have that in the {corpus.act}."
+    chunks_by_corpus: dict[str, list[RetrievedChunk]] = {
+        c.id: retrieve(
+            qdrant,
+            c,
+            query,
+            k=settings.retrieval_k,
+            score_threshold=settings.retrieval_score_threshold,
+        )
+        for c in routing.corpora
+    }
+    all_chunks = [ch for chunks in chunks_by_corpus.values() for ch in chunks]
+    acts = [c.act for c in routing.corpora]
+    response_corpus_id = "hybrid" if routing.is_hybrid else routing.corpora[0].id
+
+    if not all_chunks:
+        answer = f"I don't have that in the {' or '.join(acts)}."
         ingest_version = "n/a"
     else:
-        system_prompt = build_system_prompt(corpus.act, corpus.short)
-        context_block = build_context_block(chunks)
+        if routing.is_hybrid:
+            system_prompt = build_hybrid_system_prompt(routing.corpora)
+            context_block = build_hybrid_context(chunks_by_corpus)
+        else:
+            corpus = routing.corpora[0]
+            system_prompt = build_system_prompt(corpus.act, corpus.short)
+            context_block = build_context_block(all_chunks)
         user_message = f"Context:\n{context_block}\n\nQuestion: {build_user_message(query)}"
         try:
             answer = await llm.complete(system_prompt, user_message)
         except LLMError as e:
             logger.error("llm_provider_failed", error=str(e))
             raise HTTPException(status_code=502, detail="The answer service is unavailable") from e
-        ingest_version = chunks[0].ingest_version
+        ingest_version = all_chunks[0].ingest_version
 
     try:
         chat_repo.insert_turn(
-            user.id, session_id, query, answer, corpus=corpus.id, ingest_version=ingest_version
+            user.id,
+            session_id,
+            query,
+            answer,
+            corpus=response_corpus_id,
+            ingest_version=ingest_version,
         )
     except Exception as e:
         logger.error("failed_to_store_chat", session_id=session_id, error=str(e))
 
-    return ChatResponse(response=answer, session_id=session_id, corpus=corpus.id, act=corpus.act)
+    return ChatResponse(
+        response=answer, session_id=session_id, corpus=response_corpus_id, acts=acts
+    )
