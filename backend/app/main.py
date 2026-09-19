@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
+from qdrant_client import QdrantClient
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -13,7 +14,8 @@ from app.api import auth, chat, health, pages, sessions
 from app.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.core.rate_limit import limiter
-from app.rag.ingest import build_or_load_vector_store
+from app.corpora.registry import load_registry
+from app.llm.factory import build_llm_provider
 from app.repositories.chat_repository import ChatRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
@@ -36,11 +38,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.refresh_token_repository = RefreshTokenRepository(db)
     logger.info("connected_to_mongo")
 
-    # Ported from Flask's import-time ingestion (D017, open, Sprint 3 moves this
-    # to a decoupled `scripts/ingest.py` so a slow/failed ingest can't take the
-    # whole app down at every restart). Lifespan is the FastAPI-idiomatic
-    # equivalent of Flask's top-level module code, not a behaviour change.
-    app.state.vector_store = build_or_load_vector_store()
+    # D017 (closed): ingestion is no longer part of app startup at all — it
+    # runs as its own CLI (scripts/ingest.py). Startup only connects to
+    # collections that ingest.py already built, and fails readiness (not a
+    # hard crash) if an enabled corpus's collection is missing.
+    app.state.qdrant = QdrantClient(url=settings.qdrant_url)
+    app.state.corpus_registry = registry = load_registry()
+    app.state.corpus_ready = {}
+    for corpus in registry.enabled():
+        exists = app.state.qdrant.collection_exists(corpus.collection)
+        app.state.corpus_ready[corpus.id] = exists
+        if not exists:
+            logger.error(
+                "corpus_collection_missing", corpus=corpus.id, collection=corpus.collection
+            )
+
+    app.state.llm_provider = build_llm_provider(settings)
     logger.info("startup_complete")
 
     yield

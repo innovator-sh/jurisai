@@ -1,8 +1,9 @@
-"""Liveness now; real dependency checks (Mongo/vector store/LLM provider
-reachability) on /readyz are Sprint 4 work — this is a placeholder that
-always succeeds so the route exists for Docker/CI healthchecks today."""
+"""Liveness always succeeds. Readiness checks that every enabled corpus's
+Qdrant collection actually exists (D017/item 2) — full dependency reachability
+(Mongo, LLM provider) is Sprint 4's job, not duplicated here."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
@@ -13,5 +14,8 @@ def healthz() -> dict[str, str]:
 
 
 @router.get("/readyz")
-def readyz() -> dict[str, str]:
-    return {"status": "ok"}
+def readyz(request: Request) -> JSONResponse:
+    corpus_ready: dict[str, bool] = getattr(request.app.state, "corpus_ready", {})
+    if all(corpus_ready.values()):
+        return JSONResponse(status_code=200, content={"status": "ok", "corpora": corpus_ready})
+    return JSONResponse(status_code=503, content={"status": "not ready", "corpora": corpus_ready})

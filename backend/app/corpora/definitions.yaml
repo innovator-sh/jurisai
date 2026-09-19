@@ -1,0 +1,29 @@
+# Declares every statute the app knows about. Nothing else in the codebase
+# should name a corpus id as a literal string — see registry.py.
+#
+# `enabled: false` means "declared, not yet ingested" — bns is here so the
+# schema and every downstream seam (router, prompts, session fields) prove
+# out against a real second corpus shape, without pretending it's usable
+# yet. Sprint 3B flips this to true once BNS text is ingested.
+corpora:
+  - id: ipc
+    act: "Indian Penal Code, 1860"
+    short: IPC
+    jurisdiction: IN
+    in_force_from: 1862-01-01
+    in_force_to: 2024-06-30 # offences on/after 1 Jul 2024 are BNS
+    superseded_by: bns
+    source: data/ipc
+    collection: jurisai_ipc
+    enabled: true
+
+  - id: bns
+    act: "Bharatiya Nyaya Sanhita, 2023"
+    short: BNS
+    jurisdiction: IN
+    in_force_from: 2024-07-01
+    in_force_to: null
+    supersedes: ipc
+    source: data/bns
+    collection: jurisai_bns
+    enabled: false

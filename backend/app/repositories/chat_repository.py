@@ -19,7 +19,16 @@ class ChatRepository:
         self.collection: Collection[dict[str, Any]] = db["chat_history"]
         self.collection.create_index([("user_id", 1), ("session_id", 1)])
 
-    def insert_turn(self, user_id: str, session_id: str, query: str, response: str) -> None:
+    def insert_turn(
+        self,
+        user_id: str,
+        session_id: str,
+        query: str,
+        response: str,
+        *,
+        corpus: str,
+        ingest_version: str,
+    ) -> None:
         title = query[:50] + "..." if len(query) > 50 else query
         self.collection.insert_one(
             {
@@ -29,6 +38,8 @@ class ChatRepository:
                 "response": response,
                 "timestamp": datetime.now(UTC),
                 "title": title,
+                "corpus": corpus,
+                "ingest_version": ingest_version,
             }
         )
 
@@ -68,7 +79,12 @@ class ChatRepository:
             {"user_id": user_id, "session_id": session_id}
         ).sort("timestamp", 1)
         return [
-            {"query": c["query"], "response": c["response"], "timestamp": c["timestamp"]}
+            {
+                "query": c["query"],
+                "response": c["response"],
+                "timestamp": c["timestamp"],
+                "corpus": c.get("corpus"),
+            }
             for c in chats
         ]
 

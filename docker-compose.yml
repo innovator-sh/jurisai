@@ -10,7 +10,6 @@ services:
       QDRANT_URL: http://qdrant:6333
     volumes:
       - ./data:/app/backend/data:ro
-      - chroma_db:/app/backend/db
     depends_on:
       - mongo
       - qdrant
@@ -20,14 +19,13 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  # Not yet used by the app (wired up in Sprint 3) — present now so Sprint 3
-  # doesn't need to touch this file, per the plan's target compose shape.
   qdrant:
     image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333" # so `python scripts/ingest.py` can run from the host
     volumes:
       - qdrant_storage:/qdrant/storage
 
 volumes:
   mongo_data:
   qdrant_storage:
-  chroma_db:
