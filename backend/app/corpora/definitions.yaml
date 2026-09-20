@@ -1,10 +1,11 @@
 # Declares every statute the app knows about. Nothing else in the codebase
 # should name a corpus id as a literal string — see registry.py.
 #
-# `enabled: false` means "declared, not yet ingested" — bns is here so the
-# schema and every downstream seam (router, prompts, session fields) prove
-# out against a real second corpus shape, without pretending it's usable
-# yet. Sprint 3B flips this to true once BNS text is ingested.
+# `loader` names a module in corpora/loaders/ — each source document is
+# typeset completely differently (confirmed by testing, not assumed: the
+# IPC loader finds zero sections in the BNS PDF and vice versa), so this is
+# what lets the registry stay declarative even though the two formats need
+# genuinely different parsers.
 corpora:
   - id: ipc
     act: "Indian Penal Code, 1860"
@@ -15,6 +16,7 @@ corpora:
     superseded_by: bns
     source: data/ipc
     collection: jurisai_ipc
+    loader: ipc_commentary
     enabled: true
 
   - id: bns
@@ -26,4 +28,5 @@ corpora:
     supersedes: ipc
     source: data/bns
     collection: jurisai_bns
-    enabled: false
+    loader: bns_bare_act
+    enabled: true
