@@ -48,6 +48,26 @@ class TestIpcCommentaryLoader:
         assert "999" in skipped
         assert "999" not in [s.number for s in sections]
 
+    def test_bare_repealed_marker_is_excluded_not_ingested_as_garbage(self):
+        """The exact bug found on sections 216B, 226, 478, 480, 490, 492:
+        a heading immediately followed by "[Repealed]"/"[Omitted]" has no
+        live statute text, but _TITLE_END_RE doesn't stop there -- title
+        and body consumption both ran on into unrelated footnote/next-
+        chapter text (confirmed: section 490's extracted "text" turned out
+        to be chapter XIX's introductory essay, not section 490's content).
+        Such a heading must be skipped outright, not ingested with
+        whatever text happened to follow."""
+        pages = [
+            "[s 490] [Repealed]\n2.[* * *].\n1. The Works of Lord Macaulay - Note P.\n"
+            "2. Omitted by Act 3 of 1925.\nTHE INDIAN PENAL CODE\nCHAPTER XIX OF SOMETHING\n"
+            "The authors of the Code observe some unrelated essay text here that goes on.\n"
+            "[s 493] Cohabitation caused by a man.\nWhoever cohabits.\nCOMMENT—"
+        ]
+        sections, skipped = ipc_commentary.extract_sections(pages)
+        assert "490" in skipped
+        assert "490" not in [s.number for s in sections]
+        assert "493" in [s.number for s in sections]
+
 
 class TestBnsBareActLoader:
     SAMPLE = (

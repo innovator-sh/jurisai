@@ -40,6 +40,17 @@ list:
    principle Sprint 3's retrieval threshold applies at query time — no
    chunk is better than a wrong one — just applied at ingest time instead.
    `scripts/ingest.py` prints which sections were skipped.
+5. A section whose heading is immediately followed by a bare "[Repealed]"
+   or "[Omitted]" (10 sections found this way: 13, 15, 16, 138A, 216B,
+   226, 478, 480, 490, 492) has no live statute text at all -- that
+   bracket IS the IPC's own way of saying so. `_TITLE_END_RE` doesn't
+   treat the bracket as a title terminator, so title/body consumption
+   both ran on past it into whatever unrelated footnote, case citation, or
+   even next-chapter introductory essay happened to contain the next
+   '.'/em-dash -- confirmed by inspection: section 490's extracted "text"
+   turned out to be chapter XIX's introductory prose, not section 490's
+   content (which has none, repealed in 1925). These are detected before
+   title/body consumption runs and skipped outright, the same as case 4.
 """
 
 import re
@@ -60,6 +71,11 @@ _FOOTNOTE_BRACKET_RE = re.compile(r"\d+\.\[")
 # "Rape.—A man is said to...") pack the title and the start of the body on
 # one visual line with no line break between them at all.
 _TITLE_END_RE = re.compile(r"[.—�]")
+# A heading immediately followed by one of these has no live statute text
+# -- see module docstring point 5. Checked before title/body consumption,
+# not as a _TITLE_END_RE terminator, because the real problem isn't where
+# the title ends -- it's that there's no body to bound at all.
+_DEAD_SECTION_RE = re.compile(r"^\s*\[(Repealed|Omitted)\]", re.IGNORECASE)
 
 MAX_RAW_SECTION_CHARS = 10_000
 
@@ -113,6 +129,9 @@ def extract_sections(pages: list[str]) -> tuple[list[RawSection], list[str]]:
     skipped = []
     for idx, match in enumerate(headings):
         number = match.group(1)
+        if _DEAD_SECTION_RE.match(full_text[match.end() : match.end() + 30]):
+            skipped.append(number)
+            continue
         title, body_start = _consume_title(full_text, match.end())
         body_end = headings[idx + 1].start() if idx + 1 < len(headings) else len(full_text)
         block = full_text[body_start:body_end]
