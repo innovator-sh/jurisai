@@ -53,48 +53,73 @@ EXCLUDED_BNS_SECTIONS = {"2", "3"}  # definitions / general explanations -- see 
 LOOKAHEAD = 6  # how far ahead to search when resyncing after a missed match
 
 _ENTRY_RE = re.compile(r"(\d+[A-Z]{0,2})\.\s+")
+_SUBITEM_RE = re.compile(r"(\d+[A-Z]{0,2})\((?:[a-z]|\d+)\)")
 _SPECIAL_WORDS = ("New Section", "New Sub-Section", "Deleted")
 _SPECIAL_RE = re.compile(r"\b(" + "|".join(_SPECIAL_WORDS) + r")\b")
 
 
-def _tokenize(table_text: str) -> list[tuple[str | None, str]]:
+def _tokenize(table_text: str) -> list[tuple[str | None, str, bool]]:
     """Flattens the table into a stream of (section_number_or_None, trailing
-    content) tokens. A None-number token marks a special word ("New
-    Section", "Deleted") at that position -- its own trailing content is
-    whatever text follows before the next boundary, not the marker word
+    content, is_ipc_side) tokens. A None-number token marks a special word
+    ("New Section", "Deleted") at that position -- its own trailing content
+    is whatever text follows before the next boundary, not the marker word
     itself (callers checking for a specific marker should track boundary
-    identity, not this token's content)."""
+    identity, not this token's content).
+
+    Multi-mapping rows (one BNS section corresponding to several IPC
+    sections, e.g. BNS s 1 absorbing IPC ss 1-5) list each IPC reference
+    after a bracketed sub-item marker: "1(4) 3. Punishment...". Those
+    bracket markers are tracked (not emitted as their own token) so the
+    bare number immediately following one can be flagged is_ipc_side=True
+    -- this is what lets _group_rows tell a genuine BNS row header apart
+    from an IPC-column reference whose number coincidentally matches an
+    upcoming BNS section number (the exact bug that corrupted BNS ss
+    4/5/8/10/12: IPC ss 2-5, tabulated under BNS s 1's sub-items, were
+    misread as BNS s 2/3/4/5 headers because both sides are small
+    sequential integers early in the document)."""
     flat = re.sub(r"\s+", " ", table_text)
-    boundaries: list[tuple[int, int, str | None]] = []
+    boundaries: list[tuple[int, int, str | None, str]] = []
     for m in _ENTRY_RE.finditer(flat):
-        boundaries.append((m.start(), m.end(), m.group(1)))
+        boundaries.append((m.start(), m.end(), m.group(1), "entry"))
+    for m in _SUBITEM_RE.finditer(flat):
+        boundaries.append((m.start(), m.end(), m.group(1), "subitem"))
     for m in _SPECIAL_RE.finditer(flat):
-        boundaries.append((m.start(), m.end(), None))
+        boundaries.append((m.start(), m.end(), None, "special"))
     boundaries.sort(key=lambda b: b[0])
 
     tokens = []
-    for idx, (_, end, number) in enumerate(boundaries):
+    prev_kind = None
+    for idx, (_, end, number, kind) in enumerate(boundaries):
         content_end = boundaries[idx + 1][0] if idx + 1 < len(boundaries) else len(flat)
-        tokens.append((number, flat[end:content_end].strip()))
+        if kind == "subitem":
+            prev_kind = kind
+            continue
+        is_ipc_side = prev_kind == "subitem"
+        tokens.append((number, flat[end:content_end].strip(), is_ipc_side))
+        prev_kind = kind
     return tokens
 
 
 def _group_rows(
-    tokens: list[tuple[str | None, str]], bns_sequence: list[str]
+    tokens: list[tuple[str | None, str, bool]], bns_sequence: list[str]
 ) -> list[tuple[str, list[str]]]:
     """Groups the token stream into (bns_number, [ipc_numbers]) rows,
     resyncing against the known BNS section sequence when a match is found
     further ahead than immediately next -- without this, one missed match
-    anywhere in the document silently corrupts every row after it."""
+    anywhere in the document silently corrupts every row after it.
+
+    A number flagged is_ipc_side by _tokenize is never treated as a BNS row
+    boundary, even if it coincidentally equals an upcoming BNS section
+    number -- it is always appended to the currently open row instead."""
     rows: list[tuple[str, list[str]]] = []
     current_bns: str | None = None
     current_ipc: list[str] = []
     skip_current = False
     seq_idx = 0
 
-    for number, _ in tokens:
+    for number, _, is_ipc_side in tokens:
         is_new_row = False
-        if number is not None and seq_idx < len(bns_sequence):
+        if not is_ipc_side and number is not None and seq_idx < len(bns_sequence):
             window = bns_sequence[seq_idx : seq_idx + LOOKAHEAD]
             if number in window:
                 seq_idx += window.index(number)
