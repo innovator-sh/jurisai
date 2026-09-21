@@ -102,7 +102,7 @@ def _tokenize(table_text: str) -> list[tuple[str | None, str, bool]]:
 
 def _group_rows(
     tokens: list[tuple[str | None, str, bool]], bns_sequence: list[str]
-) -> list[tuple[str, list[str]]]:
+) -> tuple[list[tuple[str, list[str]]], set[str]]:
     """Groups the token stream into (bns_number, [ipc_numbers]) rows,
     resyncing against the known BNS section sequence when a match is found
     further ahead than immediately next -- without this, one missed match
@@ -110,8 +110,19 @@ def _group_rows(
 
     A number flagged is_ipc_side by _tokenize is never treated as a BNS row
     boundary, even if it coincidentally equals an upcoming BNS section
-    number -- it is always appended to the currently open row instead."""
+    number -- it is always appended to the currently open row instead.
+
+    Also returns the set of IPC numbers seen under an EXCLUDED_BNS_SECTIONS
+    row (s 2 Definitions, s 3 General explanations). Those rows are dropped
+    from the output because they're term definitions, not offences -- but
+    the IPC numbers they reference are real, in-scope correspondences, not
+    unmapped ones. Without tracking them separately, build_draft's repeal-
+    candidate check (based on "never appears in any row") would wrongly
+    flag every IPC definitions-chapter section (6, 7, 33, 46, 47, ...) as a
+    possible repeal, since dropping s 2/s 3's rows also silently dropped
+    the fact that those sections *were* accounted for."""
     rows: list[tuple[str, list[str]]] = []
+    excluded_ipc_refs: set[str] = set()
     current_bns: str | None = None
     current_ipc: list[str] = []
     skip_current = False
@@ -126,8 +137,11 @@ def _group_rows(
                 is_new_row = True
 
         if is_new_row:
-            if current_bns is not None and not skip_current:
-                rows.append((current_bns, current_ipc))
+            if current_bns is not None:
+                if skip_current:
+                    excluded_ipc_refs.update(current_ipc)
+                else:
+                    rows.append((current_bns, current_ipc))
             current_bns = number
             current_ipc = []
             skip_current = number in EXCLUDED_BNS_SECTIONS
@@ -135,9 +149,12 @@ def _group_rows(
         elif number is not None:
             current_ipc.append(number)
 
-    if current_bns is not None and not skip_current:
-        rows.append((current_bns, current_ipc))
-    return rows
+    if current_bns is not None:
+        if skip_current:
+            excluded_ipc_refs.update(current_ipc)
+        else:
+            rows.append((current_bns, current_ipc))
+    return rows, excluded_ipc_refs
 
 
 def _classify_relation(ipc_numbers: list[str]) -> str:
@@ -163,7 +180,7 @@ def build_draft() -> None:
 
     table_text = "\n".join(bns_pages[TABLE_START_PAGE:TABLE_END_PAGE])
     tokens = _tokenize(table_text)
-    rows = _group_rows(tokens, bns_sequence)
+    rows, excluded_ipc_refs = _group_rows(tokens, bns_sequence)
 
     referenced_ipc: set[str] = set()
     csv_rows = []
@@ -184,9 +201,14 @@ def build_draft() -> None:
         )
 
     # Repeal candidates: IPC sections the loader found that never appear in
-    # any row's mapping. Indirect and imperfect -- see module docstring.
+    # any row's mapping, AND aren't accounted for by an excluded BNS s 2/s 3
+    # (Definitions / General explanations) row -- those are real, in-scope
+    # correspondences, just not offence-to-offence ones. Indirect and
+    # imperfect -- see module docstring.
     all_ipc_numbers = set(ipc_titles)
-    repeal_candidates = sorted(all_ipc_numbers - referenced_ipc, key=lambda n: (len(n), n))
+    repeal_candidates = sorted(
+        all_ipc_numbers - referenced_ipc - excluded_ipc_refs, key=lambda n: (len(n), n)
+    )
     for ipc_num in repeal_candidates:
         csv_rows.append(
             {
