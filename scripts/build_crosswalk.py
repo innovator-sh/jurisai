@@ -56,15 +56,23 @@ _ENTRY_RE = re.compile(r"(\d+[A-Z]{0,2})\.\s+")
 _SUBITEM_RE = re.compile(r"(\d+[A-Z]{0,2})\((?:[a-z]|\d+)\)")
 _SPECIAL_WORDS = ("New Section", "New Sub-Section", "Deleted")
 _SPECIAL_RE = re.compile(r"\b(" + "|".join(_SPECIAL_WORDS) + r")\b")
+# A row's own title sometimes cross-references another section in prose,
+# e.g. BNS s341's title reads "...forgery punishable under section 338." --
+# that "338" is a self-reference, not a real table-column entry, and the
+# word "section" immediately before it is what tells the two apart: a real
+# entry is always a bare "N. Title", never "section N.".
+_SECTION_PREFIX_RE = re.compile(r"\bsection\s*$", re.IGNORECASE)
 
 
-def _tokenize(table_text: str) -> list[tuple[str | None, str, bool]]:
+def _tokenize(table_text: str) -> tuple[list[tuple[str | None, str, bool, int]], str]:
     """Flattens the table into a stream of (section_number_or_None, trailing
-    content, is_ipc_side) tokens. A None-number token marks a special word
-    ("New Section", "Deleted") at that position -- its own trailing content
-    is whatever text follows before the next boundary, not the marker word
-    itself (callers checking for a specific marker should track boundary
-    identity, not this token's content).
+    content, is_ipc_side, start_pos) tokens, plus the flattened text itself
+    (needed by _group_rows for the "section N" self-reference check, which
+    has to look back from a token's own position). A None-number token
+    marks a special word ("New Section", "Deleted") at that position -- its
+    own trailing content is whatever text follows before the next boundary,
+    not the marker word itself (callers checking for a specific marker
+    should track boundary identity, not this token's content).
 
     Multi-mapping rows (one BNS section corresponding to several IPC
     sections, e.g. BNS s 1 absorbing IPC ss 1-5) list each IPC reference
@@ -89,19 +97,19 @@ def _tokenize(table_text: str) -> list[tuple[str | None, str, bool]]:
 
     tokens = []
     prev_kind = None
-    for idx, (_, end, number, kind) in enumerate(boundaries):
+    for idx, (start, end, number, kind) in enumerate(boundaries):
         content_end = boundaries[idx + 1][0] if idx + 1 < len(boundaries) else len(flat)
         if kind == "subitem":
             prev_kind = kind
             continue
         is_ipc_side = prev_kind == "subitem"
-        tokens.append((number, flat[end:content_end].strip(), is_ipc_side))
+        tokens.append((number, flat[end:content_end].strip(), is_ipc_side, start))
         prev_kind = kind
-    return tokens
+    return tokens, flat
 
 
 def _group_rows(
-    tokens: list[tuple[str | None, str, bool]], bns_sequence: list[str]
+    tokens: list[tuple[str | None, str, bool, int]], flat: str, bns_sequence: list[str]
 ) -> tuple[list[tuple[str, list[str]]], set[str]]:
     """Groups the token stream into (bns_number, [ipc_numbers]) rows,
     resyncing against the known BNS section sequence when a match is found
@@ -111,6 +119,15 @@ def _group_rows(
     A number flagged is_ipc_side by _tokenize is never treated as a BNS row
     boundary, even if it coincidentally equals an upcoming BNS section
     number -- it is always appended to the currently open row instead.
+
+    A number that would otherwise be appended as IPC-side content (never
+    one that matches as a genuine new BNS row) is dropped if it's a prose
+    self-reference like "...forgery punishable under section 338." -- BNS
+    s341's actual bug. The check runs here, after the row-boundary decision,
+    not in _tokenize, because doing it unconditionally there also silently
+    dropped genuine BNS row headers that happened to be preceded by the
+    word "section" in the PRECEDING row's trailing prose (confirmed: 9 BNS
+    sections vanished from the output this way when first tried).
 
     Also returns the set of IPC numbers seen under an EXCLUDED_BNS_SECTIONS
     row (s 2 Definitions, s 3 General explanations). Those rows are dropped
@@ -128,7 +145,7 @@ def _group_rows(
     skip_current = False
     seq_idx = 0
 
-    for number, _, is_ipc_side in tokens:
+    for number, _, is_ipc_side, start in tokens:
         is_new_row = False
         if not is_ipc_side and number is not None and seq_idx < len(bns_sequence):
             window = bns_sequence[seq_idx : seq_idx + LOOKAHEAD]
@@ -146,7 +163,7 @@ def _group_rows(
             current_ipc = []
             skip_current = number in EXCLUDED_BNS_SECTIONS
             seq_idx += 1
-        elif number is not None:
+        elif number is not None and not _SECTION_PREFIX_RE.search(flat, 0, start):
             current_ipc.append(number)
 
     if current_bns is not None:
@@ -179,8 +196,8 @@ def build_draft() -> None:
     bns_sequence = [s.number for s in bns_sections]
 
     table_text = "\n".join(bns_pages[TABLE_START_PAGE:TABLE_END_PAGE])
-    tokens = _tokenize(table_text)
-    rows, excluded_ipc_refs = _group_rows(tokens, bns_sequence)
+    tokens, flat = _tokenize(table_text)
+    rows, excluded_ipc_refs = _group_rows(tokens, flat, bns_sequence)
 
     referenced_ipc: set[str] = set()
     csv_rows = []

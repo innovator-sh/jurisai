@@ -51,6 +51,40 @@ list:
    turned out to be chapter XIX's introductory prose, not section 490's
    content (which has none, repealed in 1925). These are detected before
    title/body consumption runs and skipped outright, the same as case 4.
+6. A footnote-number artifact can share its bracket with the heading
+   marker itself instead of using its own separate one: section 4's real
+   heading is "45.[s 4]" (one bracket total), not "45.[[s 4]" (two
+   brackets, section 34's pattern) or a bare "[s 4]". The original regex
+   only handled the other two forms, so this variant matched nothing at
+   all -- not even caught by the MAX_RAW_SECTION_CHARS or bare-repealed-
+   marker exclusions, just silently absent with no signal anywhere. Found
+   by grepping the full text for every "N.[s M]" occurrence and checking
+   which M never turned up in extract_sections's own output at all: 17
+   sections were missing this way, including s4 (extraterritorial
+   jurisdiction), the obscenity cluster (292-295A), and several sexual-
+   offence provisions (366A, 366B, 376AB, 376C, 376E) -- a much bigger,
+   previously-unknown gap than case 4's 7 sections.
+7. A footnote-number artifact isn't always digits -- some pages use
+   asterisks instead ("Forged **[document or electronic record]" on
+   section 470, "***[" on 471). `_FOOTNOTE_BRACKET_RE` only stripped the
+   digit form, so the asterisks leaked into the cleaned title verbatim.
+8. The heading marker isn't always followed by a plain space before the
+   title -- section 228A's is "416.[s 228A]-- Disclosure of..." (an
+   em-dash with no space at all between the bracket and it), which the
+   original `\]\s+` requirement couldn't match, silently dropping the
+   section the same way case 6 did.
+
+Known remaining gap, not yet fixed: a handful of definitions-chapter
+sections (confirmed: 17) use a bracketed, unpunctuated single-word title
+("21.[s 17] \"Government\"") with no terminator before the body sentence
+starts on the next line -- unlike sibling definitions (33, 46, 47, ...)
+whose quoted term IS followed by a period. `_consume_title` has nothing to
+stop at, so it runs into the body and grabs an inline footnote number as
+its accidental terminator, which -- unlike the title-only cosmetic
+artifacts on 292/293/294A -- also truncates section 17's actual retrievable
+text (its opening definition sentence ends up misclassified as the title
+and lost). Needs a dedicated fix, not a quick patch, since the ambiguity is
+title-vs-body itself, not the token pattern.
 """
 
 import re
@@ -59,12 +93,17 @@ import unicodedata
 from app.corpora.loaders.base import RawSection
 
 # A genuine heading starts a line, optionally preceded by a footnote-number
-# artifact ("170.[[s 34] ..."). Digits-only class after "s " deliberately
-# excludes "[s 302.1]" (sub-commentary headings within a section's own
-# annotation, not real section boundaries).
-_HEADING_RE = re.compile(r"^(?:\d+\.\[)?\[s (\d+[A-Z]{0,3})\]\s+", re.MULTILINE)
+# artifact, which can appear two ways: with its own bracket ("170.[[s 34]",
+# two brackets total) or sharing the heading's own bracket ("45.[s 4]", one
+# bracket total -- the two forms coexist in this source). Digits-only class
+# after "s " deliberately excludes "[s 302.1]" (sub-commentary headings
+# within a section's own annotation, not real section boundaries).
+_HEADING_RE = re.compile(r"^(?:\d+\.\[?)?\[s (\d+[A-Z]{0,3})\]\s*[.—�]?\s*", re.MULTILINE)
 _COMMENT_RE = re.compile(r"^COMMENT\b", re.MULTILINE)
-_FOOTNOTE_BRACKET_RE = re.compile(r"\d+\.\[")
+# A footnote-number artifact prefixing bracketed text, either digit-based
+# ("196.[imprisonment...]") or asterisk-based ("**[document...]" -- seen on
+# sections 470/471, apparently used when no footnote number was assigned).
+_FOOTNOTE_BRACKET_RE = re.compile(r"(?:\d+\.|\*+)\[")
 # A title ends at the first '.', em-dash, or PDF-font-decode replacement
 # character (some pages render an em-dash as U+FFFD instead of '—') —
 # wherever it falls, not necessarily at end-of-line. Some sections (e.g.

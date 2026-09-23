@@ -42,6 +42,47 @@ class TestIpcCommentaryLoader:
         sections, _ = ipc_commentary.extract_sections(pages)
         assert sections[0].number == "34"
 
+    def test_single_bracket_footnote_prefix_before_heading_is_tolerated(self):
+        """The exact bug found on section 4 (and 16 others: 17, 292-295A,
+        29A, 108A, 195A, 216A, 228A, 366A, 366B, 376AB, 376C, 376E): the
+        footnote number shares its bracket with the heading marker instead
+        of using its own separate one -- "45.[s 4]" (one bracket total),
+        not "45.[[s 4]" (section 34's two-bracket pattern) or a bare
+        "[s 4]". The original regex only handled the other two forms, so
+        this variant matched nothing -- not even flagged as skipped, just
+        silently absent from the retrieval index."""
+        pages = [
+            "45.[s 4] Extension of Code to extraterritorial offences.\n"
+            "The provisions of this Code apply.\nCOMMENT—"
+        ]
+        sections, _ = ipc_commentary.extract_sections(pages)
+        assert sections[0].number == "4"
+
+    def test_heading_followed_by_dash_with_no_space_is_tolerated(self):
+        """The exact bug found on section 228A: the heading bracket is
+        immediately followed by an em-dash with no space at all --
+        "416.[s 228A]--Disclosure of..." -- which the original `\\]\\s+`
+        requirement couldn't match, silently dropping the section."""
+        pages = [
+            "416.[s 228A]— Disclosure of identity of the victim.\n"
+            "Whoever discloses the identity.\nCOMMENT—"
+        ]
+        sections, _ = ipc_commentary.extract_sections(pages)
+        assert sections[0].number == "228A"
+        assert sections[0].title == "Disclosure of identity of the victim"
+
+    def test_asterisk_footnote_bracket_is_stripped_from_title(self):
+        """The exact bug found on sections 470/471: the footnote-number
+        artifact isn't always digits -- some pages use asterisks instead
+        ("Forged **[document or electronic record]"). Only the digit form
+        was stripped, so the asterisks leaked into the cleaned title."""
+        pages = [
+            "[s 470] Forged **[document or electronic record].\n"
+            "A false document made wholly or in part by forgery.\nCOMMENT—"
+        ]
+        sections, _ = ipc_commentary.extract_sections(pages)
+        assert sections[0].title == "Forged document or electronic record"
+
     def test_oversized_section_is_excluded_not_ingested(self):
         pages = ["[s 999] Some title.\n" + ("filler " * 2000) + "\n[s 1000] Next.\nBody.\nCOMMENT—"]
         sections, skipped = ipc_commentary.extract_sections(pages)
