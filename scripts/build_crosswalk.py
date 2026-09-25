@@ -52,7 +52,7 @@ TABLE_END_PAGE = 73  # bns_bare_act.BODY_START_SIGNATURE lands here
 EXCLUDED_BNS_SECTIONS = {"2", "3"}  # definitions / general explanations -- see module docstring
 LOOKAHEAD = 6  # how far ahead to search when resyncing after a missed match
 
-_ENTRY_RE = re.compile(r"(\d+[A-Z]{0,2})\.\s+")
+_ENTRY_RE = re.compile(r"(\d+[A-Z]{0,2})\.\s*(?!\d)")
 _SUBITEM_RE = re.compile(r"(\d+[A-Z]{0,2})\((?:[a-z]|\d+)\)")
 _SPECIAL_WORDS = ("New Section", "New Sub-Section", "Deleted")
 _SPECIAL_RE = re.compile(r"\b(" + "|".join(_SPECIAL_WORDS) + r")\b")
@@ -64,27 +64,32 @@ _SPECIAL_RE = re.compile(r"\b(" + "|".join(_SPECIAL_WORDS) + r")\b")
 _SECTION_PREFIX_RE = re.compile(r"\bsection\s*$", re.IGNORECASE)
 
 
-def _tokenize(table_text: str) -> tuple[list[tuple[str | None, str, bool, int]], str]:
+def _tokenize(table_text: str) -> tuple[list[tuple[str | None, str, bool, int, str]], str]:
     """Flattens the table into a stream of (section_number_or_None, trailing
-    content, is_ipc_side, start_pos) tokens, plus the flattened text itself
-    (needed by _group_rows for the "section N" self-reference check, which
-    has to look back from a token's own position). A None-number token
-    marks a special word ("New Section", "Deleted") at that position -- its
-    own trailing content is whatever text follows before the next boundary,
-    not the marker word itself (callers checking for a specific marker
-    should track boundary identity, not this token's content).
+    content, is_ipc_side, start_pos, kind) tokens, plus the flattened text
+    itself (needed by _group_rows for the "section N" self-reference check,
+    which has to look back from a token's own position). `kind` is "entry",
+    "subitem", or the literal matched special word ("Deleted", "New
+    Section", "New Sub-Section") -- callers needing to know what preceded a
+    token look at the previous token's `kind`, not a separate flag per
+    marker. A None-number token's own trailing content is whatever text
+    follows before the next boundary, not the marker word itself.
 
     Multi-mapping rows (one BNS section corresponding to several IPC
     sections, e.g. BNS s 1 absorbing IPC ss 1-5) list each IPC reference
-    after a bracketed sub-item marker: "1(4) 3. Punishment...". Those
-    bracket markers are tracked (not emitted as their own token) so the
-    bare number immediately following one can be flagged is_ipc_side=True
-    -- this is what lets _group_rows tell a genuine BNS row header apart
-    from an IPC-column reference whose number coincidentally matches an
-    upcoming BNS section number (the exact bug that corrupted BNS ss
-    4/5/8/10/12: IPC ss 2-5, tabulated under BNS s 1's sub-items, were
-    misread as BNS s 2/3/4/5 headers because both sides are small
-    sequential integers early in the document)."""
+    after a bracketed sub-item marker: "1(4) 3. Punishment...". Subitem
+    tokens carry their own leading number (e.g. "1" in "1(4)") with empty
+    content -- _group_rows uses that number only to resync against the BNS
+    sequence when a row's real "N. Title" header is missing entirely (BNS s
+    319's table row skips straight to "319(1) 416." with no "319. Cheating
+    by personation" header of its own). The bare number immediately
+    following a subitem marker is flagged is_ipc_side=True -- this is what
+    lets _group_rows tell a genuine BNS row header apart from an IPC-column
+    reference whose number coincidentally matches an upcoming BNS section
+    number (the exact bug that corrupted BNS ss 4/5/8/10/12: IPC ss 2-5,
+    tabulated under BNS s 1's sub-items, were misread as BNS s 2/3/4/5
+    headers because both sides are small sequential integers early in the
+    document)."""
     flat = re.sub(r"\s+", " ", table_text)
     boundaries: list[tuple[int, int, str | None, str]] = []
     for m in _ENTRY_RE.finditer(flat):
@@ -92,24 +97,22 @@ def _tokenize(table_text: str) -> tuple[list[tuple[str | None, str, bool, int]],
     for m in _SUBITEM_RE.finditer(flat):
         boundaries.append((m.start(), m.end(), m.group(1), "subitem"))
     for m in _SPECIAL_RE.finditer(flat):
-        boundaries.append((m.start(), m.end(), None, "special"))
+        boundaries.append((m.start(), m.end(), None, m.group(1)))
     boundaries.sort(key=lambda b: b[0])
 
     tokens = []
     prev_kind = None
     for idx, (start, end, number, kind) in enumerate(boundaries):
         content_end = boundaries[idx + 1][0] if idx + 1 < len(boundaries) else len(flat)
-        if kind == "subitem":
-            prev_kind = kind
-            continue
         is_ipc_side = prev_kind == "subitem"
-        tokens.append((number, flat[end:content_end].strip(), is_ipc_side, start))
+        content = "" if kind == "subitem" else flat[end:content_end].strip()
+        tokens.append((number, content, is_ipc_side, start, kind))
         prev_kind = kind
     return tokens, flat
 
 
 def _group_rows(
-    tokens: list[tuple[str | None, str, bool, int]], flat: str, bns_sequence: list[str]
+    tokens: list[tuple[str | None, str, bool, int, str]], flat: str, bns_sequence: list[str]
 ) -> tuple[list[tuple[str, list[str]]], set[str]]:
     """Groups the token stream into (bns_number, [ipc_numbers]) rows,
     resyncing against the known BNS section sequence when a match is found
@@ -119,6 +122,27 @@ def _group_rows(
     A number flagged is_ipc_side by _tokenize is never treated as a BNS row
     boundary, even if it coincidentally equals an upcoming BNS section
     number -- it is always appended to the currently open row instead.
+
+    A subitem token (e.g. the "319" in "319(1)") is normally just a marker
+    for the entry that follows it and contributes nothing itself -- but a
+    few BNS rows (s 319 "Cheating by personation" is the confirmed case)
+    have no "N. Title" header of their own at all; the table jumps straight
+    to "319(1) 416. Cheating by personation. 319(2) 419. ...". Without
+    resyncing on the subitem's own number too, that whole row -- and every
+    IPC number under it -- would silently vanish. This only fires when the
+    subitem's number differs from the currently open row and matches the
+    next expected BNS section, so it can't misfire on the ordinary case of
+    a subitem continuing the row it already belongs to (e.g. "70(2)" while
+    s 70 is already open).
+
+    A number immediately following a "Deleted" marker is dropped, not
+    appended to whatever row happens to be open -- the table uses this
+    inline ("Deleted 124A. Sedition 152. Acts endangering...") to state
+    that a specific IPC section has NO Bns successor, which previously got
+    misread as an IPC-side reference of the row open just before it (BNS s
+    151 wrongly absorbed IPC s 124A this way). Dropping it here lets
+    build_draft's ordinary "never referenced anywhere" repeal-candidate
+    inference catch it correctly instead.
 
     A number that would otherwise be appended as IPC-side content (never
     one that matches as a genuine new BNS row) is dropped if it's a prose
@@ -144,12 +168,21 @@ def _group_rows(
     current_ipc: list[str] = []
     skip_current = False
     seq_idx = 0
+    prev_kind: str | None = None
 
-    for number, _, is_ipc_side, start in tokens:
+    for number, _, is_ipc_side, start, kind in tokens:
         is_new_row = False
-        if not is_ipc_side and number is not None and seq_idx < len(bns_sequence):
+        if (
+            kind in ("entry", "subitem")
+            and number is not None
+            and number != current_bns
+            and seq_idx < len(bns_sequence)
+        ):
             window = bns_sequence[seq_idx : seq_idx + LOOKAHEAD]
-            if number in window:
+            if kind == "entry" and not is_ipc_side and number in window:
+                seq_idx += window.index(number)
+                is_new_row = True
+            elif kind == "subitem" and number in window:
                 seq_idx += window.index(number)
                 is_new_row = True
 
@@ -163,8 +196,15 @@ def _group_rows(
             current_ipc = []
             skip_current = number in EXCLUDED_BNS_SECTIONS
             seq_idx += 1
-        elif number is not None and not _SECTION_PREFIX_RE.search(flat, 0, start):
+        elif (
+            kind == "entry"
+            and number is not None
+            and prev_kind != "Deleted"
+            and not _SECTION_PREFIX_RE.search(flat, 0, start)
+        ):
             current_ipc.append(number)
+
+        prev_kind = kind
 
     if current_bns is not None:
         if skip_current:
