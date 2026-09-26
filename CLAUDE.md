@@ -13,17 +13,18 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** Sprint 3B done — BNS is a second live, enabled corpus
-(`corpora/loaders/bns_bare_act.py`), hybrid retrieval across both corpora
-works, and a draft (unreviewed) IPC↔BNS crosswalk exists at
-`data/crosswalk/ipc_bns.csv`. Sprints 0-3 are merged to `main`. Next up:
-**human review of the crosswalk** (blocking before any crosswalk-backed
-claim reaches a live answer — see `docs/decisions.md`'s Sprint 3B entry and
-`scripts/build_crosswalk.py`'s docstring for exactly what needs checking),
-or Sprint 4 (API hardening) in parallel. See `docs/decisions.md` for what
-landed each sprint and why — the Sprint 3 and 3B entries both document real
-bugs found by testing each source-format parser against the actual PDFs,
-worth reading before touching anything in `corpora/loaders/`.
+**Current status:** Sprint 3B done and merged (PR #70) — BNS is a second
+live, enabled corpus (`corpora/loaders/bns_bare_act.py`), hybrid retrieval
+across both corpora works, and the IPC↔BNS crosswalk at
+`data/crosswalk/ipc_bns.csv` is now human-reviewed (`confidence=reviewed`
+on all 380 rows) after a full pass that found and fixed real parser bugs in
+both `corpora/loaders/ipc_commentary.py` and `scripts/build_crosswalk.py` —
+see `docs/decisions.md` for what landed and why. Sprints 0-3B are merged to
+`main`. A handful of interpretive/data-quality questions from that review
+didn't get silently resolved and are tracked as issues #74-#77 (D061-D064)
+instead. Next up: **Sprint 4 (API hardening)**, or building the first
+feature that actually consumes the now-reviewed crosswalk (e.g. surfacing a
+section's BNS/IPC equivalent alongside an answer) — not yet decided which.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
