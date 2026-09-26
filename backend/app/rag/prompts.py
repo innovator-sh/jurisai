@@ -5,6 +5,7 @@ last — the shape the plan calls for, and what makes prompt caching on the
 context block possible once a provider that supports it is wired in.
 """
 
+from app.corpora.crosswalk import Crosswalk, CrosswalkRow
 from app.corpora.registry import Corpus
 from app.rag.retriever import RetrievedChunk
 
@@ -15,6 +16,8 @@ _SYSTEM_TEMPLATE = """You are JurisAI, a legal information assistant for Indian 
 Answer ONLY using the {act} excerpts provided below. Do not use outside knowledge.
 Every statement must cite its section number, e.g. "(Section 302, {short})".
 If the provided excerpts do not answer the question, say so plainly rather than guessing.
+For any cross-reference to another act's section, use only the VERIFIED
+CORRESPONDENCE section below — never infer one from the excerpts alone.
 
 This is legal information, not legal advice — always end your answer by recommending \
 the user consult a qualified lawyer for their specific situation."""
@@ -27,10 +30,11 @@ on or after 1 July 2024 but still governs offences committed before that date.
 
 Answer ONLY using the excerpts provided. Do not use outside knowledge. Structure your answer as:
 1. The current position under {primary_short}, with its section number.
-2. The corresponding provision(s) under the earlier act(s), with their section numbers, if the \
-excerpts show one — do not guess a correspondence that isn't in the excerpts.
-3. If the excerpts indicate the provision was newly introduced, or its wording changed, say so \
-explicitly rather than implying continuity.
+2. The corresponding provision(s) under the earlier act(s), with their section numbers, using
+ONLY the VERIFIED CORRESPONDENCE section below — never infer or guess a correspondence from
+the excerpts themselves.
+3. If the VERIFIED CORRESPONDENCE section states a provision is new, or has no successor, say
+so explicitly rather than implying continuity.
 
 Never state a section number without naming its act. If the excerpts don't answer the question, \
 say so plainly rather than guessing.
@@ -72,3 +76,49 @@ def build_hybrid_context(chunks_by_corpus: dict[str, list[RetrievedChunk]]) -> s
 
 def build_user_message(query: str) -> str:
     return query.strip()
+
+
+def collect_crosswalk_facts(
+    crosswalk: Crosswalk, chunks_by_corpus: dict[str, list[RetrievedChunk]]
+) -> list[CrosswalkRow]:
+    """One entry per distinct crosswalk row touched by anything actually
+    retrieved this turn, deduped — the same row is reachable from every IPC
+    section in a merged group (e.g. BNS 178 is `lookup`-able from both IPC
+    231 and IPC 232), and would otherwise repeat in the prompt."""
+    seen: dict[tuple[str, tuple[str, ...]], CrosswalkRow] = {}
+    for corpus_id, chunks in chunks_by_corpus.items():
+        sections = {c.section for c in chunks}
+        for section in sections:
+            for row in crosswalk.lookup(corpus_id, section):
+                key = (row.bns_section, tuple(row.ipc_sections))
+                seen.setdefault(key, row)
+    return list(seen.values())
+
+
+def build_crosswalk_block(rows: list[CrosswalkRow]) -> str:
+    if not rows:
+        return "(No verified correspondence found for the retrieved sections.)"
+    lines = []
+    for row in rows:
+        if row.bns_section and row.ipc_sections:
+            ipc_list = ", ".join(row.ipc_sections)
+            line = (
+                f"BNS {row.bns_section} <-> IPC {ipc_list} "
+                f"({row.relation}) -- {row.bns_title}"
+            )
+        elif row.bns_section:
+            line = (
+                f"BNS {row.bns_section} is a NEW provision with no IPC "
+                f"predecessor -- {row.bns_title}"
+            )
+        else:
+            ipc_list = ", ".join(row.ipc_sections)
+            ipc_title_list = ", ".join(row.ipc_titles)
+            line = (
+                f"IPC {ipc_list} has no established BNS successor "
+                f"({row.relation}) -- {ipc_title_list}"
+            )
+        if row.notes:
+            line += f" (note: {row.notes})"
+        lines.append(line)
+    return "\n".join(lines)

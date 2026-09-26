@@ -13,11 +13,24 @@ class ChatRequest(BaseModel):
     offence_date: date | None = None
 
 
+class CrosswalkFact(BaseModel):
+    """A single verified IPC<->BNS row grounding this answer, straight from
+    the human-reviewed data/crosswalk/ipc_bns.csv — never LLM-inferred."""
+
+    bns_section: str
+    bns_title: str
+    ipc_sections: list[str]
+    ipc_titles: list[str]
+    relation: str
+    notes: str
+
+
 class ChatResponse(BaseModel):
     response: str
     session_id: str
     corpus: str  # a corpus id, or "hybrid" when more than one was used
     acts: list[str]  # every act actually cited from, primary corpus first
+    crosswalk: list[CrosswalkFact] = []
 
 
 class SessionSummary(BaseModel):

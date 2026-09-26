@@ -14,6 +14,7 @@ from app.api import auth, chat, health, pages, sessions
 from app.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.core.rate_limit import limiter
+from app.corpora.crosswalk import load_crosswalk
 from app.corpora.registry import load_registry
 from app.llm.factory import build_llm_provider
 from app.repositories.chat_repository import ChatRepository
@@ -54,6 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
 
     app.state.llm_provider = build_llm_provider(settings)
+    app.state.crosswalk = load_crosswalk()
     logger.info("startup_complete")
 
     yield

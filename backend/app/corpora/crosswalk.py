@@ -43,6 +43,18 @@ class Crosswalk:
     def from_ipc(self, section: str) -> list[CrosswalkRow]:
         return self._by_ipc.get(section, [])
 
+    def lookup(self, corpus_id: str, section: str) -> list[CrosswalkRow]:
+        """corpus_id is one of the two ids this crosswalk is inherently
+        about -- this module's whole purpose is the ipc<->bns mapping, so
+        (unlike route code, which never names a corpus literally -- see
+        corpora/registry.py) it's the one legitimate place for those two
+        literals to live."""
+        if corpus_id == "ipc":
+            return self.from_ipc(section)
+        if corpus_id == "bns":
+            return self.from_bns(section)
+        return []
+
 
 def load_crosswalk(path: Path = DEFAULT_CSV_PATH) -> Crosswalk:
     if not path.exists():

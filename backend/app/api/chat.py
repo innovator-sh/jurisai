@@ -18,15 +18,24 @@ from fastapi import APIRouter, HTTPException, Request
 from app.core.logging import get_logger
 from app.core.rate_limit import limiter
 from app.core.security import CurrentUser
-from app.deps import ChatRepositoryDep, CorpusRegistryDep, LLMProviderDep, QdrantDep, SettingsDep
+from app.deps import (
+    ChatRepositoryDep,
+    CorpusRegistryDep,
+    CrosswalkDep,
+    LLMProviderDep,
+    QdrantDep,
+    SettingsDep,
+)
 from app.llm.base import LLMError
-from app.models.chat import ChatRequest, ChatResponse
+from app.models.chat import ChatRequest, ChatResponse, CrosswalkFact
 from app.rag.prompts import (
     build_context_block,
+    build_crosswalk_block,
     build_hybrid_context,
     build_hybrid_system_prompt,
     build_system_prompt,
     build_user_message,
+    collect_crosswalk_facts,
 )
 from app.rag.retriever import RetrievedChunk, retrieve
 from app.rag.router import resolve_corpus
@@ -43,6 +52,7 @@ async def chat(
     user: CurrentUser,
     qdrant: QdrantDep,
     registry: CorpusRegistryDep,
+    crosswalk: CrosswalkDep,
     llm: LLMProviderDep,
     chat_repo: ChatRepositoryDep,
     settings: SettingsDep,
@@ -74,10 +84,24 @@ async def chat(
     acts = [c.act for c in routing.corpora]
     response_corpus_id = "hybrid" if routing.is_hybrid else routing.corpora[0].id
 
+    crosswalk_facts: list[CrosswalkFact] = []
     if not all_chunks:
         answer = f"I don't have that in the {' or '.join(acts)}."
         ingest_version = "n/a"
     else:
+        crosswalk_rows = collect_crosswalk_facts(crosswalk, chunks_by_corpus)
+        crosswalk_facts = [
+            CrosswalkFact(
+                bns_section=r.bns_section,
+                bns_title=r.bns_title,
+                ipc_sections=r.ipc_sections,
+                ipc_titles=r.ipc_titles,
+                relation=r.relation,
+                notes=r.notes,
+            )
+            for r in crosswalk_rows
+        ]
+        crosswalk_block = build_crosswalk_block(crosswalk_rows)
         if routing.is_hybrid:
             system_prompt = build_hybrid_system_prompt(routing.corpora)
             context_block = build_hybrid_context(chunks_by_corpus)
@@ -85,7 +109,11 @@ async def chat(
             corpus = routing.corpora[0]
             system_prompt = build_system_prompt(corpus.act, corpus.short)
             context_block = build_context_block(all_chunks)
-        user_message = f"Context:\n{context_block}\n\nQuestion: {build_user_message(query)}"
+        user_message = (
+            f"Context:\n{context_block}\n\n"
+            f"VERIFIED CORRESPONDENCE (human-reviewed):\n{crosswalk_block}\n\n"
+            f"Question: {build_user_message(query)}"
+        )
         try:
             answer = await llm.complete(system_prompt, user_message)
         except LLMError as e:
@@ -106,5 +134,9 @@ async def chat(
         logger.error("failed_to_store_chat", session_id=session_id, error=str(e))
 
     return ChatResponse(
-        response=answer, session_id=session_id, corpus=response_corpus_id, acts=acts
+        response=answer,
+        session_id=session_id,
+        corpus=response_corpus_id,
+        acts=acts,
+        crosswalk=crosswalk_facts,
     )

@@ -4,6 +4,7 @@ from fastapi import Depends, Request
 from qdrant_client import QdrantClient
 
 from app.config import Settings
+from app.corpora.crosswalk import Crosswalk
 from app.corpora.registry import CorpusRegistry
 from app.llm.base import LLMProvider
 from app.repositories.chat_repository import ChatRepository
@@ -21,6 +22,10 @@ def get_qdrant(request: Request) -> QdrantClient:
 
 def get_corpus_registry(request: Request) -> CorpusRegistry:
     return cast(CorpusRegistry, request.app.state.corpus_registry)
+
+
+def get_crosswalk(request: Request) -> Crosswalk:
+    return cast(Crosswalk, request.app.state.crosswalk)
 
 
 def get_llm_provider(request: Request) -> LLMProvider:
@@ -42,6 +47,7 @@ def get_refresh_token_repository(request: Request) -> RefreshTokenRepository:
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 QdrantDep = Annotated[QdrantClient, Depends(get_qdrant)]
 CorpusRegistryDep = Annotated[CorpusRegistry, Depends(get_corpus_registry)]
+CrosswalkDep = Annotated[Crosswalk, Depends(get_crosswalk)]
 LLMProviderDep = Annotated[LLMProvider, Depends(get_llm_provider)]
 ChatRepositoryDep = Annotated[ChatRepository, Depends(get_chat_repository)]
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
