@@ -13,18 +13,25 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** Sprint 3B done and merged (PR #70) — BNS is a second
-live, enabled corpus (`corpora/loaders/bns_bare_act.py`), hybrid retrieval
-across both corpora works, and the IPC↔BNS crosswalk at
-`data/crosswalk/ipc_bns.csv` is now human-reviewed (`confidence=reviewed`
-on all 380 rows) after a full pass that found and fixed real parser bugs in
-both `corpora/loaders/ipc_commentary.py` and `scripts/build_crosswalk.py` —
-see `docs/decisions.md` for what landed and why. Sprints 0-3B are merged to
-`main`. A handful of interpretive/data-quality questions from that review
-didn't get silently resolved and are tracked as issues #74-#77 (D061-D064)
-instead. Next up: **Sprint 4 (API hardening)**, or building the first
-feature that actually consumes the now-reviewed crosswalk (e.g. surfacing a
-section's BNS/IPC equivalent alongside an answer) — not yet decided which.
+**Current status:** Sprint 4 (API hardening) done — the crosswalk at
+`data/crosswalk/ipc_bns.csv` is human-reviewed (`confidence=reviewed` on
+all 380 rows) and now actually consumed: `/api/chat` grounds every
+IPC↔BNS cross-reference in it via `corpora/crosswalk.py`'s `lookup()`
+instead of leaving it to LLM inference (`rag/prompts.py`'s
+`build_crosswalk_block`), and returns it as a structured `crosswalk` field
+on `ChatResponse`. Sprint 4 itself closed out
+`docs/production-hardening-plan.md`'s checklist: global exception handling
+with request-id propagation (`core/errors.py`, `core/request_id.py`, no
+route builds its own error response anymore), CORS from config (and fixed
+a real `Settings()`-crashing bug in `CORS_ORIGINS` parsing along the way),
+security headers, `extra="forbid"` on every request model, a real
+`/readyz` Mongo check, and the `/rename_session` false-404 fix — see
+`docs/decisions.md` for the full list and issue numbers. Sprints 0-4 are
+merged to `main`. Interpretive/data-quality questions from the crosswalk
+review are tracked as issues #74-#77 (D061-D064), still open. Next up:
+**Sprint 5 (frontend rebuild)** — no frontend exists yet in the greenfield
+tree (`api/pages.py` serves only `login.html`) — or Sprint 6 (deploy +
+compliance) in parallel; not yet decided which.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
