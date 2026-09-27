@@ -1,8 +1,6 @@
 """Ported from jurisai/Backend/app.py, now scoped by user_id everywhere
 (D004-D008, Sprint 2) — a session that isn't yours matches nothing, so every
 route built on this returns 404 rather than leaking whether it exists.
-
-Still open, Sprint 4: no `$sort` after the `$group` in get_history.
 """
 
 from datetime import UTC, datetime
@@ -89,15 +87,15 @@ class ChatRepository:
         ]
 
     def rename_session(self, user_id: str, session_id: str, new_title: str) -> bool:
-        # D026 (open, Sprint 4): modified_count is 0 on a no-op rename (same
-        # title), which the route below reports as 404 even though the
-        # session exists and belongs to this user. Kept as-is here on
-        # purpose — not fixed as a drive-by while this line was already
-        # being touched for user_id scoping.
+        """True if the session exists and belongs to this user — regardless
+        of whether the title actually changed. D026 (closed): renaming to
+        the session's current title used to report 404, since MongoDB's
+        `modified_count` is 0 on a no-op update; existence is now checked
+        via `matched_count`, which is set even when nothing was modified."""
         result = self.collection.update_many(
             {"user_id": user_id, "session_id": session_id}, {"$set": {"title": new_title}}
         )
-        return result.modified_count > 0
+        return result.matched_count > 0
 
     def delete_session(self, user_id: str, session_id: str) -> bool:
         result = self.collection.delete_many({"user_id": user_id, "session_id": session_id})

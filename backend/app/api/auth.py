@@ -44,6 +44,7 @@ def _issue_tokens(
         refresh_token,
         httponly=True,
         samesite="strict",
+        secure=settings.cookie_secure,
         max_age=int(REFRESH_TOKEN_TTL.total_seconds()),
     )
     return TokenResponse(access_token=access_token)

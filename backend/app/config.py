@@ -1,4 +1,4 @@
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROVIDER_KEY_FIELDS = {
@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # App
     log_level: str = "INFO"
     cors_origins: list[str] = ["http://localhost:8000"]
+    # False only for local docker-compose without Caddy's TLS in front —
+    # a secure cookie is silently never sent back over plain HTTP.
+    cookie_secure: bool = True
 
     # Vector store (Sprint 3)
     qdrant_url: str = "http://qdrant:6333"
@@ -37,6 +40,18 @@ class Settings(BaseSettings):
     # Retrieval (Sprint 3)
     retrieval_k: int = 3
     retrieval_score_threshold: float = 0.5
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_comma_separated(cls, value: object) -> object:
+        """.env.example documents CORS_ORIGINS as a bare comma-separated
+        string (CORS_ORIGINS=http://a,http://b), but pydantic-settings'
+        default env parsing for a list field expects JSON syntax and raises
+        SettingsError on anything else — reproduced directly, not assumed.
+        A real list (e.g. constructed in tests) passes through unchanged."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
     @model_validator(mode="after")
     def _require_selected_provider_key(self) -> "Settings":

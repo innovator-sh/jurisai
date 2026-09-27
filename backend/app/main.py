@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from qdrant_client import QdrantClient
@@ -12,8 +12,11 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.api import auth, chat, health, pages, sessions
 from app.config import Settings, get_settings
+from app.core.errors import http_exception_handler, unhandled_exception_handler
 from app.core.logging import configure_logging, get_logger
 from app.core.rate_limit import limiter
+from app.core.request_id import RequestIDMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.corpora.crosswalk import load_crosswalk
 from app.corpora.registry import load_registry
 from app.llm.factory import build_llm_provider
@@ -66,19 +69,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(title="JurisAI", lifespan=lifespan)
 
-    # D013: still all origins, matching legacy `CORS(app)` — tightened in Sprint 4
-    # once there's a real frontend origin to scope it to via settings.cors_origins.
-    # Not a blocker for the cookie-based refresh flow below: the login page is
-    # served same-origin by this app until Sprint 5 introduces a separate origin.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
     )
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestIDMiddleware)
 
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, unhandled_exception_handler)
     app.add_middleware(SlowAPIMiddleware)
 
     app.include_router(health.router)

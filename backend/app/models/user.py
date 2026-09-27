@@ -1,24 +1,26 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import EmailStr, Field
+
+from app.models.base import APIModel
 
 
-class SignupRequest(BaseModel):
+class SignupRequest(APIModel):
     email: EmailStr
     password: str = Field(min_length=8)
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(APIModel):
     email: EmailStr
     password: str
 
 
-class TokenResponse(BaseModel):
+class TokenResponse(APIModel):
     access_token: str
     token_type: str = "bearer"
 
 
-class UserPublic(BaseModel):
+class UserPublic(APIModel):
     id: str
     email: str
     created_at: datetime

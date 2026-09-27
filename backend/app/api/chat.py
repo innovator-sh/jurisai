@@ -7,8 +7,9 @@ sprint's docs/decisions.md entry). Sprint 3B additionally wires the router's
 hybrid default (previously unreachable — Sprint 3 only ever had one corpus
 enabled) into an actual multi-corpus retrieval + answer contract.
 
-Still open, Sprint 4: D014 (exception detail reaches the client), D029
-(chat-persistence failure is only logged, not surfaced).
+D014 closed Sprint 4 (core/errors.py's global handlers, not a per-route fix
+— this route never built its own error response to begin with).
+Still open: D029 (chat-persistence failure is only logged, not surfaced).
 """
 
 import uuid

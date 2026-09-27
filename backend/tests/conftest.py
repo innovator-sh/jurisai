@@ -38,5 +38,10 @@ def client(fake_llm):
     ):
         from app.main import app
 
-        with TestClient(app) as test_client:
+        # raise_server_exceptions=False: production never lets an unhandled
+        # exception escape as a Python traceback — core/errors.py's global
+        # handler always turns it into a real 500 response — so tests should
+        # see that same response, not a raised exception TestClient would
+        # otherwise re-raise by default even with a handler registered.
+        with TestClient(app, raise_server_exceptions=False) as test_client:
             yield test_client
