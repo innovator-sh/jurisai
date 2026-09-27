@@ -66,7 +66,7 @@ class ChatRepository:
             results.append(
                 {
                     "session_id": str(s["_id"]),
-                    "title": s["title"] or fallback_title,
+                    "title": s.get("title") or fallback_title,
                     "timestamp": s["timestamp"],
                 }
             )
