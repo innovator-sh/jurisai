@@ -231,8 +231,13 @@ def build_draft() -> None:
 
     bns_sections, _ = bns_bare_act.extract_sections(bns_pages)
     ipc_sections, _ = ipc_commentary.extract_sections(ipc_pages)
-    bns_titles = {s.number: s.title for s in bns_sections}
-    ipc_titles = {s.number: s.title for s in ipc_sections}
+    # ';' is this CSV's multi-value delimiter (ipc_section/ipc_title can list
+    # several numbers for a merged row) -- a title that happens to contain a
+    # literal ';' (confirmed: IPC s158's raw source text has one) would
+    # silently misalign ipc_section against ipc_title on read. Scrubbed once
+    # here rather than at every join site below.
+    bns_titles = {s.number: s.title.replace(";", ",") for s in bns_sections}
+    ipc_titles = {s.number: s.title.replace(";", ",") for s in ipc_sections}
     bns_sequence = [s.number for s in bns_sections]
 
     table_text = "\n".join(bns_pages[TABLE_START_PAGE:TABLE_END_PAGE])

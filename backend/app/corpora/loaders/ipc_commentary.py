@@ -1,4 +1,4 @@
-"""Loader for the IPC source: an annotated commentary edition (~1870 pages:
+r"""Loader for the IPC source: an annotated commentary edition (~1870 pages:
 statute text interleaved with case law, footnotes, and cross-references
 under `[s <N>]` markers) — not a bare-act text. Several things follow from
 that, each found by testing this parser against known sections (302, 379,
@@ -24,21 +24,21 @@ list:
    follow are legal opinion, not law, and conflating them with the
    authoritative text is exactly the kind of correctness bug a legal tool
    cannot ship with.
-4. A handful of sections (107, 108, 109, 121, 375, 376, 464 — heavily
-   amended, subsection-lettered provisions) don't have a detectable
-   "COMMENT" boundary or a matching next heading in this format, so
-   extraction runs on and swallows a neighbouring section's text (confirmed
-   by inspection: content that is actually section 376 turned up labelled
-   as 375). Spot-checking confirmed everything else — including other long
-   sections like 300 (murder) and 499 (defamation, correctly ending at its
-   real "Tenth Exception") — extracts cleanly. Given that, sections whose
-   raw block exceeds `MAX_RAW_SECTION_CHARS` are excluded rather than
-   ingested with unverified, likely-mislabelled content: there's a clean
-   gap in the length distribution between the longest confirmed-correct
-   section (8,637 chars) and the shortest confirmed-contaminated one
-   (13,058 chars), so the threshold sits in that gap. This is the same
-   principle Sprint 3's retrieval threshold applies at query time — no
-   chunk is better than a wrong one — just applied at ingest time instead.
+4. Sections whose raw block (heading to next heading) exceeds
+   `MAX_RAW_SECTION_CHARS` are excluded rather than ingested with
+   unverified, likely-mislabelled content — a block that long either means
+   the real "COMMENT" boundary wasn't found (see point 9 below) or that
+   this is a genuine duplicate/quoted heading instance elsewhere in the
+   document (confirmed: sections 375 and 376 each have exactly one clean,
+   correctly-bounded instance that's kept, plus one over-length duplicate
+   elsewhere that's correctly excluded — the number still appearing
+   correctly extracted AND in the skipped list simultaneously is that
+   second, harmless instance, not a contradiction). There's a clean gap in
+   the length distribution between the longest confirmed-correct section
+   (8,637 chars) and the shortest confirmed-contaminated one (13,058
+   chars), so the threshold sits in that gap. This is the same principle
+   Sprint 3's retrieval threshold applies at query time — no chunk is
+   better than a wrong one — just applied at ingest time instead.
    `scripts/ingest.py` prints which sections were skipped.
 5. A section whose heading is immediately followed by a bare "[Repealed]"
    or "[Omitted]" (10 sections found this way: 13, 15, 16, 138A, 216B,
@@ -73,6 +73,30 @@ list:
    em-dash with no space at all between the bracket and it), which the
    original `\]\s+` requirement couldn't match, silently dropping the
    section the same way case 6 did.
+9. The "COMMENT" boundary marker (point 4) has two variants of its own
+   that `^COMMENT\b` didn't match, which is the actual root cause of case
+   4's original 7-section list (confirmed: fixing this recovered 107, 108,
+   109, 121, and 464 outright -- 375 and 376 turned out to already have a
+   separate, correctly-bounded instance each, per point 4's note). Some
+   sections use the plural "COMMENTS." instead of "COMMENT" -- the `\b`
+   word boundary fails between "T" and "S", so `\bCOMMENT\b` matches
+   neither. Section 121's is worse: a footnote-number artifact is glued
+   directly onto the same line with no space ("7.[***]COMMENT--"), which
+   broke the `^` line-start anchor entirely, not just the word match. Both
+   are folded into `_COMMENT_RE` itself rather than stripped beforehand, so
+   `comment_match.start()` still correctly excludes the artifact from the
+   retained statute text.
+10. A title's trailing-punctuation cleanup only stripped '.'/em-dash/the
+    PDF-decode replacement char. Section 158's real source text is "...or
+    riot;.\nWhoever is engaged..." -- a stray semicolon sits immediately
+    before the real terminating period, so `_TITLE_END_RE` correctly finds
+    the period, but the old `.rstrip(".—�")` stopped at the semicolon
+    (not in its strip set) and left it dangling on the stored title. Found
+    while filling in crosswalk titles after case 9's fix -- a title
+    containing a literal ';' silently misaligned the crosswalk CSV's own
+    ';'-delimited ipc_title column against ipc_section (see
+    scripts/build_crosswalk.py, which now also scrubs any stray ';' out of
+    every title as a second line of defence, not just this one instance).
 
 Known remaining gap, not yet fixed: a handful of definitions-chapter
 sections (confirmed: 17) use a bracketed, unpunctuated single-word title
@@ -99,7 +123,15 @@ from app.corpora.loaders.base import RawSection
 # after "s " deliberately excludes "[s 302.1]" (sub-commentary headings
 # within a section's own annotation, not real section boundaries).
 _HEADING_RE = re.compile(r"^(?:\d+\.\[?)?\[s (\d+[A-Z]{0,3})\]\s*[.—�]?\s*", re.MULTILINE)
-_COMMENT_RE = re.compile(r"^COMMENT\b", re.MULTILINE)
+# The boundary marker is usually "COMMENT" alone at a line start, but two
+# variants weren't matched: some sections use the plural "COMMENTS" instead
+# (\bCOMMENT\b's word boundary fails between "T" and "S"), and at least one
+# (s121) has a footnote-number artifact glued directly onto the same line
+# with no space ("7.[***]COMMENT—"), which broke the `^` line-start anchor.
+# Both are folded into the match itself (not stripped beforehand) so
+# `comment_match.start()` still correctly excludes the artifact from the
+# retained statute text, same as a bare "^COMMENT" match would.
+_COMMENT_RE = re.compile(r"^(?:(?:\d+\.|\*+)\[[^\]]*\]\s*)?COMMENTS?\b", re.MULTILINE)
 # A footnote-number artifact prefixing bracketed text, either digit-based
 # ("196.[imprisonment...]") or asterisk-based ("**[document...]" -- seen on
 # sections 470/471, apparently used when no footnote number was assigned).
@@ -188,7 +220,7 @@ def extract_sections(pages: list[str]) -> tuple[list[RawSection], list[str]]:
         sections.append(
             RawSection(
                 number=number,
-                title=_clean(title).rstrip(".—�").strip(),
+                title=_clean(title).rstrip(".—�;").strip(),
                 text=cleaned,
                 page=page_for_offset(match.start()),
             )

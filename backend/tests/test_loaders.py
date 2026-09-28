@@ -83,6 +83,50 @@ class TestIpcCommentaryLoader:
         sections, _ = ipc_commentary.extract_sections(pages)
         assert sections[0].title == "Forged document or electronic record"
 
+    def test_plural_comments_marker_is_recognized_as_the_boundary(self):
+        """The exact root cause of the original 107/108/109/121/464
+        "silently unretrievable" bug: some sections use "COMMENTS." (plural)
+        instead of "COMMENT" -- \\bCOMMENT\\b's word boundary fails between
+        "T" and "S", so the boundary was never found and the block ran on
+        into the next section's text until it got excluded as oversized."""
+        pages = [
+            "[s 107] Abetment of a thing.\n"
+            "A person abets the doing of a thing.\nCOMMENTS.—blah\n"
+            "[s 108] Abettor.\nBody text.\nCOMMENT—"
+        ]
+        sections, skipped = ipc_commentary.extract_sections(pages)
+        assert "107" not in skipped
+        by_number = {s.number: s for s in sections}
+        assert "COMMENTS" not in by_number["107"].text
+
+    def test_footnote_artifact_glued_onto_the_comment_marker_is_tolerated(self):
+        """The exact bug found on section 121: a footnote-number artifact
+        sits directly on the same line as "COMMENT" with no space at all
+        ("7.[***]COMMENT--"), which broke the `^` line-start anchor, not
+        just the word match."""
+        pages = [
+            "[s 121] Waging war against the Government of India.\n"
+            "Whoever wages war.\n7.[***]COMMENT—blah"
+        ]
+        sections, skipped = ipc_commentary.extract_sections(pages)
+        assert "121" not in skipped
+        assert sections[0].text == "Whoever wages war."
+
+    def test_stray_semicolon_before_the_title_terminator_is_stripped(self):
+        """The exact bug found on section 158: the raw source has "...or
+        riot;.\\nWhoever is engaged..." -- a semicolon immediately before
+        the real terminating period. _TITLE_END_RE correctly finds the
+        period, but the old rstrip(".—�") didn't include ';' in its
+        strip set, leaving it dangling on the title -- which would then
+        misalign scripts/build_crosswalk.py's ';'-delimited ipc_title
+        column against ipc_section for any row listing this section."""
+        pages = [
+            "[s 158] Being hired to take part in an unlawful assembly or riot;.\n"
+            "Whoever is engaged.\nCOMMENT—"
+        ]
+        sections, _ = ipc_commentary.extract_sections(pages)
+        assert sections[0].title == "Being hired to take part in an unlawful assembly or riot"
+
     def test_oversized_section_is_excluded_not_ingested(self):
         pages = ["[s 999] Some title.\n" + ("filler " * 2000) + "\n[s 1000] Next.\nBody.\nCOMMENT—"]
         sections, skipped = ipc_commentary.extract_sections(pages)
