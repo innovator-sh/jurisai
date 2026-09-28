@@ -44,3 +44,14 @@ class UserRepository:
         if doc is None:
             return None
         return UserPublic(id=str(doc["_id"]), email=doc["email"], created_at=doc["created_at"])
+
+    def delete(self, user_id: str) -> bool:
+        from bson import ObjectId
+        from bson.errors import InvalidId
+
+        try:
+            oid = ObjectId(user_id)
+        except InvalidId:
+            return False
+        result = self.collection.delete_one({"_id": oid})
+        return result.deleted_count > 0

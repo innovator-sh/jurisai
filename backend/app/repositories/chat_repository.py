@@ -100,3 +100,9 @@ class ChatRepository:
     def delete_session(self, user_id: str, session_id: str) -> bool:
         result = self.collection.delete_many({"user_id": user_id, "session_id": session_id})
         return result.deleted_count > 0
+
+    def delete_all_for_user(self, user_id: str) -> int:
+        """DPDP account-deletion support: a real purge, not a soft flag --
+        see api/auth.py's delete_account."""
+        result = self.collection.delete_many({"user_id": user_id})
+        return result.deleted_count

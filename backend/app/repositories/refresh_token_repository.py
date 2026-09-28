@@ -25,3 +25,9 @@ class RefreshTokenRepository:
 
     def revoke(self, jti: str) -> None:
         self.collection.update_one({"jti": jti}, {"$set": {"revoked": True}})
+
+    def delete_all_for_user(self, user_id: str) -> None:
+        """DPDP account-deletion support -- a real purge (not just marking
+        revoked), since the account itself is going away. See
+        api/auth.py's delete_account."""
+        self.collection.delete_many({"user_id": user_id})

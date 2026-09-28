@@ -21,8 +21,20 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.deps import RefreshTokenRepositoryDep, SettingsDep, UserRepositoryDep
-from app.models.user import LoginRequest, SignupRequest, TokenResponse, UserPublic
+from app.deps import (
+    ChatRepositoryDep,
+    RefreshTokenRepositoryDep,
+    SettingsDep,
+    UserRepositoryDep,
+)
+from app.models.user import (
+    DeleteAccountRequest,
+    DeleteAccountResponse,
+    LoginRequest,
+    SignupRequest,
+    TokenResponse,
+    UserPublic,
+)
 from app.repositories.user_repository import EmailAlreadyRegistered
 
 router = APIRouter()
@@ -121,3 +133,28 @@ def logout(
 @router.get("/auth/me", response_model=UserPublic)
 def me(user: Annotated[UserPublic, Depends(current_user)]) -> UserPublic:
     return user
+
+
+@router.post("/auth/delete_account", response_model=DeleteAccountResponse)
+def delete_account(
+    body: DeleteAccountRequest,
+    response: Response,
+    user: Annotated[UserPublic, Depends(current_user)],
+    user_repo: UserRepositoryDep,
+    chat_repo: ChatRepositoryDep,
+    refresh_repo: RefreshTokenRepositoryDep,
+) -> DeleteAccountResponse:
+    """DPDP-required real account deletion -- purges chat history and
+    revoked refresh tokens, not a soft flag (D059). Requires re-confirming
+    the password: the access token alone (short-lived, but still a bearer
+    credential) shouldn't be sufficient on its own to trigger something
+    this irreversible."""
+    doc = user_repo.get_by_email(user.email)
+    if doc is None or not verify_password(body.password, doc["password_hash"]):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid password")
+
+    chat_repo.delete_all_for_user(user.id)
+    refresh_repo.delete_all_for_user(user.id)
+    user_repo.delete(user.id)
+    response.delete_cookie(REFRESH_COOKIE)
+    return DeleteAccountResponse(success=True)

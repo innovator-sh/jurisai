@@ -24,3 +24,13 @@ class UserPublic(APIModel):
     id: str
     email: str
     created_at: datetime
+
+
+class DeleteAccountRequest(APIModel):
+    # Re-confirming the password guards against a leaked short-lived access
+    # token being enough on its own to trigger an irreversible deletion.
+    password: str
+
+
+class DeleteAccountResponse(APIModel):
+    success: bool
