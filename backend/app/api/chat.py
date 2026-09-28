@@ -9,7 +9,10 @@ enabled) into an actual multi-corpus retrieval + answer contract.
 
 D014 closed Sprint 4 (core/errors.py's global handlers, not a per-route fix
 — this route never built its own error response to begin with).
-Still open: D029 (chat-persistence failure is only logged, not surfaced).
+D029 closed: a persistence failure still doesn't fail the request (the LLM
+call already succeeded — that answer shouldn't be wasted for a Mongo write
+error) or get folded into the answer text, but ChatResponse.persisted now
+tells the caller honestly whether the turn was actually saved.
 """
 
 import uuid
@@ -122,6 +125,7 @@ async def chat(
             raise HTTPException(status_code=502, detail="The answer service is unavailable") from e
         ingest_version = all_chunks[0].ingest_version
 
+    persisted = True
     try:
         chat_repo.insert_turn(
             user.id,
@@ -133,6 +137,7 @@ async def chat(
         )
     except Exception as e:
         logger.error("failed_to_store_chat", session_id=session_id, error=str(e))
+        persisted = False
 
     return ChatResponse(
         response=answer,
@@ -140,4 +145,5 @@ async def chat(
         corpus=response_corpus_id,
         acts=acts,
         crosswalk=crosswalk_facts,
+        persisted=persisted,
     )

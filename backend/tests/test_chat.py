@@ -63,3 +63,39 @@ def test_chat_with_no_retrieved_chunks_has_empty_crosswalk(client):
         )
     assert response.status_code == 200
     assert response.json()["crosswalk"] == []
+
+
+def test_chat_response_reports_persisted_true_on_success(client):
+    token = signup(client, "persisted-ok@example.com")
+    with patch("app.api.chat.retrieve", return_value=IPC_302_CHUNK):
+        response = client.post(
+            "/api/chat",
+            json={"query": "what is the punishment for murder", "corpus_mode": "ipc"},
+            headers=auth_headers(token),
+        )
+    assert response.status_code == 200
+    assert response.json()["persisted"] is True
+
+
+def test_chat_still_returns_the_answer_when_persistence_fails(client, monkeypatch):
+    """D029: a Mongo write failure after a successful LLM call must not
+    waste that answer or fail the request -- it's still returned, just
+    honestly flagged as unsaved via persisted=False."""
+    from app.repositories.chat_repository import ChatRepository
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("mongo write failed")
+
+    monkeypatch.setattr(ChatRepository, "insert_turn", _boom)
+
+    token = signup(client, "persisted-fail@example.com")
+    with patch("app.api.chat.retrieve", return_value=IPC_302_CHUNK):
+        response = client.post(
+            "/api/chat",
+            json={"query": "what is the punishment for murder", "corpus_mode": "ipc"},
+            headers=auth_headers(token),
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["persisted"] is False
+    assert body["response"] == "a canned answer"  # the LLM's answer still came through

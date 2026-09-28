@@ -31,6 +31,10 @@ class ChatResponse(APIModel):
     corpus: str  # a corpus id, or "hybrid" when more than one was used
     acts: list[str]  # every act actually cited from, primary corpus first
     crosswalk: list[CrosswalkFact] = []
+    # False if the turn couldn't be saved (Mongo write failed) -- the answer
+    # is still returned since the LLM call already succeeded, but the caller
+    # should know it may not reappear in /history (D029).
+    persisted: bool = True
 
 
 class SessionSummary(APIModel):
