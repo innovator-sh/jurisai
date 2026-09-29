@@ -98,17 +98,30 @@ list:
     scripts/build_crosswalk.py, which now also scrubs any stray ';' out of
     every title as a second line of defence, not just this one instance).
 
-Known remaining gap, not yet fixed: a handful of definitions-chapter
-sections (confirmed: 17) use a bracketed, unpunctuated single-word title
-("21.[s 17] \"Government\"") with no terminator before the body sentence
-starts on the next line -- unlike sibling definitions (33, 46, 47, ...)
-whose quoted term IS followed by a period. `_consume_title` has nothing to
-stop at, so it runs into the body and grabs an inline footnote number as
-its accidental terminator, which -- unlike the title-only cosmetic
-artifacts on 292/293/294A -- also truncates section 17's actual retrievable
-text (its opening definition sentence ends up misclassified as the title
-and lost). Needs a dedicated fix, not a quick patch, since the ambiguity is
-title-vs-body itself, not the token pattern.
+11. Section 17 (only -- verified against every heading in the source, not
+    just asserted) has a bracketed, unpunctuated single-word title
+    ("21.[s 17] \"Government\"") with no terminator anywhere before the
+    body sentence starts on the next line -- unlike sibling definitions
+    (33, 46, 47, ...) whose quoted term IS followed by a period on the same
+    line. `_consume_title` had nothing to stop at, so it ran into the body
+    and grabbed an inline footnote number as its accidental terminator,
+    which -- unlike the title-only cosmetic artifacts on 292/293/294A --
+    also truncated section 17's actual retrievable text (its opening
+    definition sentence ended up misclassified as the title and lost).
+    Fixed by treating a heading's first line as the whole title when it's
+    nothing but a single quoted term with no terminator on it at all --
+    narrow enough that it can't misfire on a genuine multi-line title wrap
+    like section 149's, which has no quotes.
+
+    IPC s17 doesn't appear in data/crosswalk/ipc_bns.csv, and that's
+    correct, not a gap: the NCRB table cites it under BNS s2(12) (the
+    Definitions section), which this crosswalk deliberately excludes as
+    out-of-scope -- same treatment as IPC 14/18/29A/50/53A.
+
+    Known remaining gap, not yet fixed: s17's body still trails off into
+    unrelated footnote/case-citation text after the real definition
+    sentence (no clean COMMENT boundary bounds it) -- a broader problem
+    likely affecting other sections too, not scoped or fixed here.
 """
 
 import re
@@ -142,6 +155,14 @@ _FOOTNOTE_BRACKET_RE = re.compile(r"(?:\d+\.|\*+)\[")
 # "Rape.—A man is said to...") pack the title and the start of the body on
 # one visual line with no line break between them at all.
 _TITLE_END_RE = re.compile(r"[.—�]")
+# A heading line that's nothing but a single quoted term, with no
+# terminator at all -- see _consume_title's docstring (section 17's case).
+# Captures the inner term so the returned title matches sibling definitions
+# like s46/s47, which end up quote-free ("Death", not '"Death"') once
+# _clean()'s leading-quote-strip runs -- this branch bypasses that path
+# entirely (there's no trailing punctuation for it to trim up to), so it
+# has to strip both quotes itself rather than leaving a dangling one.
+_QUOTED_TERM_ONLY_RE = re.compile(r'^\s*"([^"\n]+)"\s*$')
 # A heading immediately followed by one of these has no live statute text
 # -- see module docstring point 5. Checked before title/body consumption,
 # not as a _TITLE_END_RE terminator, because the real problem isn't where
@@ -169,8 +190,34 @@ def _consume_title(full_text: str, start: int) -> tuple[str, int]:
     two lines with no terminator on the first), or partway through the same
     line as the body if there's no line break at all (e.g. section 375's
     "Rape.—A man is said to..." packs title and body onto one visual line).
+
+    One case needs its own rule rather than an unbounded search: a
+    definitions-chapter title that's nothing but a bare quoted term with NO
+    terminator anywhere on its own line (section 17's real heading is
+    `"Government"` with a bare line break straight into the body) — unlike
+    its sibling definitions (33, 46, 47, ...), whose quoted term IS followed
+    by a period on the same line. Without this, the unbounded search runs on
+    past the whole body looking for the next '.'/'—', which for s17 doesn't
+    turn up until deep inside an unrelated footnote number, swallowing the
+    entire real definition sentence into "title" instead of leaving it as
+    retrievable text. Detected narrowly (the whole first line, stripped, is
+    exactly one quoted phrase) so it can't misfire on an ordinary multi-line
+    title wrap like section 149's, which has no quotes at all.
+
     Returns (title, offset where the body starts)."""
+    line_end = full_text.find("\n", start)
+    if line_end == -1:
+        line_end = len(full_text)
+
     match = _TITLE_END_RE.search(full_text, start)
+    if match is not None and match.start() < line_end:
+        title = full_text[start : match.start() + 1].replace("\n", " ").strip()
+        return title, match.end()
+
+    quoted_only = _QUOTED_TERM_ONLY_RE.match(full_text[start:line_end])
+    if quoted_only is not None:
+        return quoted_only.group(1).strip(), line_end + 1
+
     if match is None:
         return full_text[start:].strip(), len(full_text)
     title = full_text[start : match.start() + 1].replace("\n", " ").strip()

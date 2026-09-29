@@ -127,6 +127,40 @@ class TestIpcCommentaryLoader:
         sections, _ = ipc_commentary.extract_sections(pages)
         assert sections[0].title == "Being hired to take part in an unlawful assembly or riot"
 
+    def test_bare_quoted_term_title_with_no_terminator_does_not_swallow_the_body(self):
+        """The exact bug found on section 17: the real heading is
+        `"Government"` with nothing else on the line -- no terminating
+        period/dash anywhere near it, unlike sibling definitions (33, 46,
+        47) whose quoted term is followed by a period on the same line.
+        Without a boundary, the unbounded search ran on into the body
+        looking for the next '.'/'—', which for s17 doesn't turn up
+        until deep inside an unrelated footnote number -- swallowing the
+        entire real definition sentence into "title" instead of leaving it
+        as retrievable text."""
+        pages = [
+            '21.[s 17] "Government"\n'
+            'The word "Government" denotes the Central Government or the Government of a 22.\n'
+            "[*** State.]\nCOMMENT—"
+        ]
+        sections, _ = ipc_commentary.extract_sections(pages)
+        assert sections[0].title == "Government"
+        assert sections[0].text.startswith('The word "Government" denotes')
+
+    def test_multi_line_title_wrap_with_no_quotes_is_unaffected(self):
+        """Regression guard for the s17 fix above: a genuine multi-line
+        title wrap (section 149's real heading) has no quotes at all, so
+        the new bare-quoted-term branch must not misfire on it -- it should
+        still fall through to the existing unbounded search."""
+        pages = [
+            "[s 149] Every member of unlawful assembly guilty of offence committed in\n"
+            "prosecution of common object.\nBody text here.\nCOMMENT—"
+        ]
+        sections, _ = ipc_commentary.extract_sections(pages)
+        assert sections[0].title == (
+            "Every member of unlawful assembly guilty of offence committed in "
+            "prosecution of common object"
+        )
+
     def test_oversized_section_is_excluded_not_ingested(self):
         pages = ["[s 999] Some title.\n" + ("filler " * 2000) + "\n[s 1000] Next.\nBody.\nCOMMENT—"]
         sections, skipped = ipc_commentary.extract_sections(pages)
