@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}JurisAI — Settings{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/pages.css') }}" />
+{% endblock %}
+{% block content %}
+{% include "_sidebar.html" %}
+
+<main class="page-content" id="mainContent">
+  <h1>Settings</h1>
+  <p class="page-intro">Preferences for how JurisAI looks and answers.</p>
+
+  <section class="settings-section">
+    <h2>Appearance</h2>
+    <div class="settings-row">
+      <div>
+        <div class="settings-row-label">Light theme</div>
+        <div class="settings-row-hint">Switches the whole app, not just this page.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="themeToggle" />
+        <span class="slider"></span>
+      </label>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>Default law</h2>
+    <div class="settings-row">
+      <div>
+        <div class="settings-row-label">Which law to ask about by default</div>
+        <div class="settings-row-hint">
+          Auto picks based on your question (and offence date, if given).
+          You can still override it per-question on the chat page.
+        </div>
+      </div>
+      <div class="corpus-pref-group" id="corpusPrefGroup" role="group" aria-label="Default law">
+        <button type="button" class="corpus-pref-option" data-corpus="">Auto</button>
+        <button type="button" class="corpus-pref-option" data-corpus="bns">BNS</button>
+        <button type="button" class="corpus-pref-option" data-corpus="ipc">IPC</button>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', path='js/auth.js') }}"></script>
+<script src="{{ url_for('static', path='js/settings.js') }}"></script>
+{% endblock %}

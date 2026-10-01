@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}JurisAI — Account{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/pages.css') }}" />
+{% endblock %}
+{% block content %}
+{% include "_sidebar.html" %}
+
+<main class="page-content" id="mainContent">
+  <h1>Account</h1>
+  <p class="page-intro">Your JurisAI account details.</p>
+
+  <section class="account-section">
+    <h2>Signed in as</h2>
+    <p class="account-email" id="accountEmail">Loading…</p>
+    <button type="button" class="btn btn-secondary" id="logoutBtn">Log out</button>
+  </section>
+
+  <section class="account-section danger-zone">
+    <h2>Delete account</h2>
+    <p>
+      This permanently deletes your account, all chat history, and all active
+      sessions. This cannot be undone.
+    </p>
+    <label for="deletePassword" class="settings-row-label">Confirm your password</label>
+    <input
+      type="password"
+      id="deletePassword"
+      class="text-input"
+      autocomplete="current-password"
+      placeholder="Password"
+    />
+    <div>
+      <button type="button" class="btn btn-danger" id="deleteAccountBtn">Delete my account</button>
+    </div>
+    <p class="form-status" id="deleteStatus" role="status"></p>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', path='js/auth.js') }}"></script>
+<script src="{{ url_for('static', path='js/account.js') }}"></script>
+{% endblock %}

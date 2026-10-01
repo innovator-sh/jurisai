@@ -11,6 +11,9 @@ class ChatRequest(APIModel):
     # no offence_date and no in-query citation defaults to hybrid (both).
     corpus_mode: str | None = None
     offence_date: date | None = None
+    # When true, /api/chat responds with text/event-stream (see api/chat.py)
+    # instead of a single ChatResponse JSON body.
+    stream: bool = False
 
 
 class CrosswalkFact(APIModel):

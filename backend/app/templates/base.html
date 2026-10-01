@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}JurisAI{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/index.css') }}" />
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {# base.js runs unblocked (no defer) so the saved theme/sidebar state applies
+     before first paint -- avoids a flash of the wrong theme. It's an external
+     file, never an inline <script>, because the CSP is default-src 'self'
+     with no 'unsafe-inline' -- see core/security_headers.py. #}
+  <script src="{{ url_for('static', path='js/base.js') }}"></script>
+
+  {% block content %}{% endblock %}
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

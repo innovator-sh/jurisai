@@ -1,70 +1,38 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>JurisAI — Sign in</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-</head>
-<body>
-  <main>
+{% extends "base.html" %}
+{% block title %}JurisAI — Sign in{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/pages.css') }}" />
+{% endblock %}
+{% block content %}
+<main class="auth-page">
+  <div class="auth-card">
     <h1>JurisAI</h1>
+    <p class="page-intro">Sign in or create an account to continue.</p>
 
     <form id="auth-form">
       <label for="email">Email</label>
-      <input id="email" type="email" required autocomplete="email" />
+      <input id="email" class="text-input" type="email" required autocomplete="email" />
 
       <label for="password">Password</label>
-      <input id="password" type="password" required autocomplete="current-password" minlength="8" />
+      <input
+        id="password"
+        class="text-input"
+        type="password"
+        required
+        autocomplete="current-password"
+        minlength="8"
+      />
 
-      <button type="submit" id="login-btn">Log in</button>
-      <button type="button" id="signup-btn">Sign up</button>
+      <div class="auth-actions">
+        <button type="submit" id="login-btn" class="btn btn-primary">Log in</button>
+        <button type="button" id="signup-btn" class="btn btn-secondary">Sign up</button>
+      </div>
     </form>
 
-    <p id="status" role="status"></p>
-  </main>
-
-  <script>
-    // Access token lives in memory only — never localStorage/sessionStorage,
-    // so it can't be read by an XSS payload that persists across page loads.
-    let accessToken = null;
-
-    const form = document.getElementById("auth-form");
-    const statusEl = document.getElementById("status");
-
-    function setStatus(text) {
-      statusEl.textContent = text; // textContent, never innerHTML
-    }
-
-    async function submitAuth(path) {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-
-      const res = await fetch(`/api/auth/${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include", // send/receive the refresh_token cookie
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setStatus(data.detail || "Something went wrong.");
-        return;
-      }
-
-      accessToken = data.access_token;
-      const meRes = await fetch("/api/auth/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const me = await meRes.json();
-      setStatus(`Signed in as ${me.email}`);
-    }
-
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      submitAuth("login");
-    });
-    document.getElementById("signup-btn").addEventListener("click", () => submitAuth("signup"));
-  </script>
-</body>
-</html>
+    <p id="status" class="form-status" role="status"></p>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', path='js/login.js') }}"></script>
+{% endblock %}
