@@ -1,9 +1,11 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 from qdrant_client import QdrantClient
 from slowapi import _rate_limit_exceeded_handler
@@ -84,6 +86,9 @@ def create_app() -> FastAPI:
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_exception_handler)
     app.add_middleware(SlowAPIMiddleware)
+
+    static_dir = Path(__file__).parent.parent / "static"
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     app.include_router(health.router)
     app.include_router(pages.router)

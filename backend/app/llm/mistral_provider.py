@@ -2,8 +2,11 @@
 config-swappable fallback behind the same protocol as Groq.
 """
 
+from collections.abc import AsyncIterator
+
 from mistralai.client import Mistral
 from mistralai.client.errors import SDKError
+from mistralai.client.utils.eventstreaming import EventStreamAsync
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.llm.base import LLMError
@@ -48,5 +51,42 @@ class MistralProvider:
     async def complete(self, system: str, user: str) -> str:
         try:
             return await self._create(system, user)
+        except SDKError as e:
+            raise LLMError(f"Mistral request failed: {e}") from e
+
+    @retry(
+        retry=retry_if_exception(_is_retryable),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        reraise=True,
+    )
+    async def _open_stream(self, system: str, user: str) -> EventStreamAsync:  # type: ignore[type-arg]
+        return await self._client.chat.stream_async(
+            model=self._model,
+            messages=[  # type: ignore[arg-type]
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=1024,
+            temperature=0.3,
+            timeout_ms=TIMEOUT_MS,
+        )
+
+    async def stream(self, system: str, user: str) -> AsyncIterator[str]:
+        # Only opening the stream is retried (same reasoning as _create /
+        # Groq's _open_stream) -- once a chunk has reached the caller, a
+        # failure mid-stream raises LLMError rather than silently retrying.
+        try:
+            events = await self._open_stream(system, user)
+        except SDKError as e:
+            raise LLMError(f"Mistral request failed: {e}") from e
+        try:
+            async for event in events:
+                choices = event.data.choices
+                if not choices:
+                    continue
+                content = choices[0].delta.content
+                if isinstance(content, str) and content:
+                    yield content
         except SDKError as e:
             raise LLMError(f"Mistral request failed: {e}") from e

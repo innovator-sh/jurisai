@@ -4,6 +4,7 @@ picks the implementation; swapping providers is a config change, not a
 route change.
 """
 
+from collections.abc import AsyncIterator
 from typing import Protocol
 
 
@@ -16,3 +17,11 @@ class LLMError(Exception):
 
 class LLMProvider(Protocol):
     async def complete(self, system: str, user: str) -> str: ...
+
+    def stream(self, system: str, user: str) -> AsyncIterator[str]:
+        """Yields the answer incrementally (Sprint 5's SSE chat). Each
+        provider only retries *opening* the stream (a retryable error before
+        any token has reached the caller) — once a chunk has been yielded,
+        retrying would silently duplicate partial output, so a failure past
+        that point raises LLMError and ends the stream instead."""
+        ...

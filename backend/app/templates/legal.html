@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}JurisAI — Legal Templates{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/pages.css') }}" />
+{% endblock %}
+{% block content %}
+{% include "_sidebar.html" %}
+
+<main class="page-content" id="mainContent">
+  <h1>Legal Templates</h1>
+  <p class="page-intro">Document templates and guided forms built on JurisAI's legal corpus.</p>
+
+  {# FIR Form: deliberately disabled, not linked to /firform. The FIR
+     feature (backend model/repository/routes + a real form replacing the
+     legacy contenteditable spans) is blocked this sprint pending real-world
+     field/workflow requirements -- see the sprint plan's step 6 note. No
+     /firform route exists yet, so this card must never link to one. #}
+  <div class="template-card disabled" aria-disabled="true">
+    <div class="card-icon">
+      <svg class="svg-icon" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+      </svg>
+    </div>
+    <div class="card-content">
+      <h3>FIR Form <span class="coming-soon-badge">Coming soon</span></h3>
+      <p>
+        First Information Report (FIR) form for reporting a crime under
+        Section 154 Cr.P.C. Being rebuilt with real data entry and saving —
+        the current prototype loses whatever you type into it.
+      </p>
+    </div>
+  </div>
+</main>
+{% endblock %}

@@ -17,12 +17,23 @@ os.environ.setdefault("GROQ_API_KEY", "test-unused-key")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-not-for-production-only-32b")
 
 
+async def _fake_stream_chunks(chunks: list[str]):
+    for chunk in chunks:
+        yield chunk
+
+
 @pytest.fixture
 def fake_llm():
     """The object returned by build_llm_provider() in tests. Override its
-    `.complete` return value per-test: `fake_llm.complete.return_value = ...`."""
+    `.complete` return value per-test: `fake_llm.complete.return_value = ...`.
+    `.stream` yields ["a canned ", "answer"] by default (joins to the same
+    "a canned answer" `.complete` returns) -- override with
+    `fake_llm.stream.side_effect = lambda *a, **kw: _fake_stream_chunks([...])`."""
     provider = MagicMock()
     provider.complete = AsyncMock(return_value="a canned answer")
+    provider.stream = MagicMock(
+        side_effect=lambda *a, **kw: _fake_stream_chunks(["a canned ", "answer"])
+    )
     return provider
 
 

@@ -1,5 +1,7 @@
+from typing import Annotated
+
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _PROVIDER_KEY_FIELDS = {
     "groq": "groq_api_key",
@@ -21,7 +23,16 @@ class Settings(BaseSettings):
 
     # App
     log_level: str = "INFO"
-    cors_origins: list[str] = ["http://localhost:8000"]
+    # NoDecode: without it, pydantic-settings tries to JSON-decode this
+    # field's raw value itself (for *any* source -- a real .env file, a
+    # real environment variable, not just the dotenv path) before
+    # _split_comma_separated below ever runs, and raises SettingsError on
+    # anything that isn't valid JSON -- which "http://localhost:8000" isn't.
+    # Confirmed the hard way: this broke every test the moment a real .env
+    # file existed on disk, even though a Settings(CORS_ORIGINS=[...]) call
+    # with a Python list passed directly (bypassing both sources) had
+    # masked it before.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8000"]
     # False only for local docker-compose without Caddy's TLS in front —
     # a secure cookie is silently never sent back over plain HTTP.
     cookie_secure: bool = True

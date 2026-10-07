@@ -1,0 +1,387 @@
+/* Extra rules for account.html / settings.html / legal.html -- kept out of
+   index.css (that file is being edited concurrently by other Sprint 5 work
+   porting the chat page's visual identity verbatim). Reuses the --dt-*/--lt-*
+   custom properties index.css already defines so these pages stay visually
+   consistent with the chat page in both themes. */
+
+.page-content {
+  margin-left: 60px;
+  padding: 30px 40px;
+  max-width: 720px;
+  color: var(--dt-text);
+}
+
+body.light-theme .page-content {
+  color: var(--lt-text);
+}
+
+.sidebar.expanded ~ .page-content {
+  margin-left: 250px;
+}
+
+.page-content h1 {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.page-content > p.page-intro {
+  color: var(--dt-text-secondary);
+  margin-bottom: 28px;
+}
+
+body.light-theme .page-content > p.page-intro {
+  color: var(--lt-text-secondary);
+}
+
+.settings-section,
+.account-section {
+  background-color: var(--dt-message-bg);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--dt-box-shadow);
+}
+
+body.light-theme .settings-section,
+body.light-theme .account-section {
+  background-color: var(--lt-message-bg);
+  box-shadow: var(--lt-box-shadow);
+}
+
+.settings-section h2,
+.account-section h2 {
+  font-size: 1.05rem;
+  margin-bottom: 14px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--dt-input-border);
+}
+
+.settings-row:first-of-type {
+  border-top: none;
+}
+
+body.light-theme .settings-row {
+  border-top-color: var(--lt-input-border);
+}
+
+.settings-row-label {
+  font-weight: 500;
+}
+
+.settings-row-hint {
+  font-size: 0.82rem;
+  color: var(--dt-text-secondary);
+  margin-top: 2px;
+}
+
+body.light-theme .settings-row-hint {
+  color: var(--lt-text-secondary);
+}
+
+/* Theme toggle switch, ported from the legacy templates' .switch pattern */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch .slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 20px;
+}
+
+.switch .slider::before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+.switch input:checked + .slider {
+  background-color: var(--dt-accent);
+}
+
+body.light-theme .switch input:checked + .slider {
+  background-color: var(--lt-accent);
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+.corpus-pref-group {
+  display: flex;
+  gap: 8px;
+}
+
+.corpus-pref-option {
+  padding: 6px 14px;
+  border-radius: 15px;
+  border: 1px solid var(--dt-input-border);
+  background: transparent;
+  color: var(--dt-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+body.light-theme .corpus-pref-option {
+  border-color: var(--lt-input-border);
+  color: var(--lt-text);
+}
+
+.corpus-pref-option.active {
+  background-color: var(--dt-accent);
+  border-color: var(--dt-accent);
+  color: #ffffff;
+}
+
+body.light-theme .corpus-pref-option.active {
+  background-color: var(--lt-accent);
+  border-color: var(--lt-accent);
+}
+
+.account-email {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--dt-accent);
+  color: #ffffff;
+}
+
+body.light-theme .btn-primary {
+  background-color: var(--lt-accent);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--dt-input-border);
+  color: var(--dt-text);
+}
+
+body.light-theme .btn-secondary {
+  border-color: var(--lt-input-border);
+  color: var(--lt-text);
+}
+
+.btn-danger {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.danger-zone {
+  border: 1px solid #dc2626;
+}
+
+.danger-zone p {
+  color: var(--dt-text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
+body.light-theme .danger-zone p {
+  color: var(--lt-text-secondary);
+}
+
+.text-input {
+  background-color: var(--dt-input-bg);
+  border: 1px solid var(--dt-input-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--dt-text);
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 12px;
+}
+
+body.light-theme .text-input {
+  background-color: var(--lt-input-bg);
+  border-color: var(--lt-input-border);
+  color: var(--lt-text);
+}
+
+.form-status {
+  font-size: 0.85rem;
+  margin-top: 8px;
+  min-height: 1.2em;
+}
+
+.form-status.error {
+  color: #dc2626;
+}
+
+.form-status.success {
+  color: #16a34a;
+}
+
+/* Legal Templates gallery -- naming kept consistent with the legacy
+   prototype's .template-card pattern (../jurisai/Backend/templates/legal.html)
+   since it's the same real-world concept, just themed via the shared
+   custom properties instead of its own duplicated :root block. */
+.template-card {
+  background-color: var(--dt-message-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: var(--dt-box-shadow);
+  transition: all 0.2s ease;
+}
+
+body.light-theme .template-card {
+  background-color: var(--lt-message-bg);
+  box-shadow: var(--lt-box-shadow);
+}
+
+.template-card.enabled {
+  cursor: pointer;
+}
+
+.template-card.enabled:hover {
+  transform: translateY(-3px);
+}
+
+.template-card.disabled {
+  opacity: 0.6;
+}
+
+.template-card .card-icon {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--dt-accent);
+}
+
+body.light-theme .template-card .card-icon {
+  color: var(--lt-accent);
+}
+
+.template-card .card-content h3 {
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-card .card-content p {
+  font-size: 0.88rem;
+  opacity: 0.8;
+}
+
+.coming-soon-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background-color: var(--dt-sidebar-active);
+  color: var(--dt-text-secondary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+body.light-theme .coming-soon-badge {
+  background-color: var(--lt-sidebar-active);
+  color: var(--lt-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .page-content,
+  .sidebar.expanded ~ .page-content {
+    margin-left: 0;
+    padding: 20px;
+  }
+}
+
+/* login.html -- the one page with no sidebar (there's no session yet). */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  background-color: var(--dt-message-bg);
+  border-radius: 10px;
+  padding: 32px 28px;
+  box-shadow: var(--dt-box-shadow);
+  color: var(--dt-text);
+}
+
+body.light-theme .auth-card {
+  background-color: var(--lt-message-bg);
+  box-shadow: var(--lt-box-shadow);
+  color: var(--lt-text);
+}
+
+.auth-card h1 {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+
+.auth-card label {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+  margin-top: 12px;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}

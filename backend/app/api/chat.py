@@ -13,11 +13,25 @@ D029 closed: a persistence failure still doesn't fail the request (the LLM
 call already succeeded — that answer shouldn't be wasted for a Mongo write
 error) or get folded into the answer text, but ChatResponse.persisted now
 tells the caller honestly whether the turn was actually saved.
+
+Sprint 5: `body.stream=true` switches to an SSE response (`_stream_chat`)
+instead of the single ChatResponse JSON body, for the rebuilt frontend's
+streamed chat UI. Retrieval, corpus routing, and crosswalk-grounding stay
+identical between the two paths — only how the answer and its metadata
+reach the client differs. Three SSE event types, in order: `crosswalk`
+(known before generation, from retrieval), `token` (one per chunk from
+llm.stream()), `done` (after the Mongo write, carrying the same
+session_id/persisted info ChatResponse.persisted already carries). A
+provider failure mid-stream can't become an HTTPException (headers are
+already sent), so it becomes an `error` event instead.
 """
 
+import json
 import uuid
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.core.logging import get_logger
 from app.core.rate_limit import limiter
@@ -30,7 +44,7 @@ from app.deps import (
     QdrantDep,
     SettingsDep,
 )
-from app.llm.base import LLMError
+from app.llm.base import LLMError, LLMProvider
 from app.models.chat import ChatRequest, ChatResponse, CrosswalkFact
 from app.rag.prompts import (
     build_context_block,
@@ -43,9 +57,63 @@ from app.rag.prompts import (
 )
 from app.rag.retriever import RetrievedChunk, retrieve
 from app.rag.router import resolve_corpus
+from app.repositories.chat_repository import ChatRepository
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+
+def _sse(event: str, data: str) -> str:
+    return f"event: {event}\ndata: {data}\n\n"
+
+
+async def _stream_chat(
+    *,
+    llm: LLMProvider,
+    chat_repo: ChatRepository,
+    user_id: str,
+    session_id: str,
+    query: str,
+    crosswalk_facts: list[CrosswalkFact],
+    system_prompt: str,
+    user_message: str,
+    has_chunks: bool,
+    no_answer: str,
+    response_corpus_id: str,
+    ingest_version: str,
+) -> AsyncIterator[str]:
+    yield _sse("crosswalk", json.dumps([f.model_dump() for f in crosswalk_facts]))
+
+    answer_parts: list[str] = []
+    if not has_chunks:
+        answer_parts.append(no_answer)
+        yield _sse("token", json.dumps(no_answer))
+    else:
+        try:
+            async for chunk in llm.stream(system_prompt, user_message):
+                answer_parts.append(chunk)
+                yield _sse("token", json.dumps(chunk))
+        except LLMError as e:
+            logger.error("llm_provider_failed", error=str(e))
+            yield _sse("error", json.dumps({"detail": "The answer service is unavailable"}))
+            return
+
+    answer = "".join(answer_parts)
+    persisted = True
+    try:
+        chat_repo.insert_turn(
+            user_id,
+            session_id,
+            query,
+            answer,
+            corpus=response_corpus_id,
+            ingest_version=ingest_version,
+        )
+    except Exception as e:
+        logger.error("failed_to_store_chat", session_id=session_id, error=str(e))
+        persisted = False
+
+    yield _sse("done", json.dumps({"session_id": session_id, "persisted": persisted}))
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -60,7 +128,7 @@ async def chat(
     llm: LLMProviderDep,
     chat_repo: ChatRepositoryDep,
     settings: SettingsDep,
-) -> ChatResponse:
+) -> ChatResponse | StreamingResponse:
     session_id = body.session_id or ""
     if not session_id or session_id == "None":
         session_id = str(uuid.uuid4())
@@ -87,12 +155,13 @@ async def chat(
     all_chunks = [ch for chunks in chunks_by_corpus.values() for ch in chunks]
     acts = [c.act for c in routing.corpora]
     response_corpus_id = "hybrid" if routing.is_hybrid else routing.corpora[0].id
+    no_answer = f"I don't have that in the {' or '.join(acts)}."
+    ingest_version = all_chunks[0].ingest_version if all_chunks else "n/a"
 
     crosswalk_facts: list[CrosswalkFact] = []
-    if not all_chunks:
-        answer = f"I don't have that in the {' or '.join(acts)}."
-        ingest_version = "n/a"
-    else:
+    system_prompt = ""
+    user_message = ""
+    if all_chunks:
         crosswalk_rows = collect_crosswalk_facts(crosswalk, chunks_by_corpus)
         crosswalk_facts = [
             CrosswalkFact(
@@ -118,12 +187,34 @@ async def chat(
             f"VERIFIED CORRESPONDENCE (human-reviewed):\n{crosswalk_block}\n\n"
             f"Question: {build_user_message(query)}"
         )
+
+    if body.stream:
+        return StreamingResponse(
+            _stream_chat(
+                llm=llm,
+                chat_repo=chat_repo,
+                user_id=user.id,
+                session_id=session_id,
+                query=query,
+                crosswalk_facts=crosswalk_facts,
+                system_prompt=system_prompt,
+                user_message=user_message,
+                has_chunks=bool(all_chunks),
+                no_answer=no_answer,
+                response_corpus_id=response_corpus_id,
+                ingest_version=ingest_version,
+            ),
+            media_type="text/event-stream",
+        )
+
+    if not all_chunks:
+        answer = no_answer
+    else:
         try:
             answer = await llm.complete(system_prompt, user_message)
         except LLMError as e:
             logger.error("llm_provider_failed", error=str(e))
             raise HTTPException(status_code=502, detail="The answer service is unavailable") from e
-        ingest_version = all_chunks[0].ingest_version
 
     persisted = True
     try:

@@ -1,10 +1,9 @@
-"""MVP default provider — free tier, fastest of the no-cost options.
-Streaming isn't wired in yet: no route consumes SSE until Sprint 5 rebuilds
-the frontend, so `complete()` is all this needs today; `stream()` lands on
-the protocol when something actually calls it.
-"""
+"""MVP default provider — free tier, fastest of the no-cost options."""
+
+from collections.abc import AsyncIterator
 
 import groq
+from groq.types.chat import ChatCompletionChunk
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.llm.base import LLMError
@@ -46,5 +45,40 @@ class GroqProvider:
     async def complete(self, system: str, user: str) -> str:
         try:
             return await self._create(system, user)
+        except groq.GroqError as e:
+            raise LLMError(f"Groq request failed: {e}") from e
+
+    @retry(
+        retry=retry_if_exception_type(_RETRYABLE),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        reraise=True,
+    )
+    async def _open_stream(self, system: str, user: str) -> groq.AsyncStream[ChatCompletionChunk]:
+        # Retryable groq.* exceptions here (before any chunk has reached the
+        # caller) must propagate uncaught, same as _create -- only opening
+        # the stream is retried, never its consumption (see base.py's
+        # LLMProvider.stream docstring).
+        return await self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=1024,
+            temperature=0.3,
+            stream=True,
+        )
+
+    async def stream(self, system: str, user: str) -> AsyncIterator[str]:
+        try:
+            chunks = await self._open_stream(system, user)
+        except groq.GroqError as e:
+            raise LLMError(f"Groq request failed: {e}") from e
+        try:
+            async for chunk in chunks:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
         except groq.GroqError as e:
             raise LLMError(f"Groq request failed: {e}") from e
