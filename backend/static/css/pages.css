@@ -343,8 +343,15 @@ body.light-theme .coming-soon-badge {
   }
 }
 
-/* login.html -- the one page with no sidebar (there's no session yet). */
+/* login.html -- the one page with no sidebar (there's no session yet).
+   index.css's `body` is `display: flex` (row, built for the sidebar +
+   main-content chat layout) with no width set here, so as a flex item
+   .auth-page only shrank to fit its content and sat at flex-start (left)
+   -- its own `justify-content: center` never got a chance to run because
+   the container itself wasn't spanning the viewport. `width: 100%` makes
+   it actually fill the row so centering inside it works. */
 .auth-page {
+  width: 100%;
   min-height: 100vh;
   display: flex;
   align-items: center;

@@ -217,3 +217,60 @@ def test_chat_stream_emits_error_event_on_llm_failure(client, fake_llm):
     names = [name for name, _ in events]
     assert names == ["crosswalk", "error"]  # no "done" -- the stream ends on the error
     assert events[1][1]["detail"] == "The answer service is unavailable"
+
+
+def test_narrative_query_retries_retrieval_with_a_reformulated_query(client, fake_llm):
+    """D066: a free-text fact pattern ("he said his sister needed eye
+    surgery...") embeds poorly against formal statute text and the first
+    retrieval pass comes back empty for every routed corpus -- confirmed
+    directly against the real index, not assumed. The fallback should
+    retry once against an LLM-reformulated, legal-concept version of the
+    query and use whatever it finds, without ever showing the
+    reformulated text to the user."""
+    narrative = "a long narrative the embedding model can't match"
+    reformulated = "cheating fraud"
+
+    def _retrieve_side_effect(_qdrant, _corpus, query, **_kwargs):
+        if query == narrative:
+            return []
+        if query == reformulated:
+            return IPC_302_CHUNK
+        raise AssertionError(f"unexpected retrieval query: {query!r}")
+
+    # .complete is called twice on this path: once for the reformulation
+    # (returns the rewritten query text), once for the real answer.
+    fake_llm.complete.side_effect = [reformulated, "a canned answer"]
+
+    token = signup(client, "narrative-retry@example.com")
+    with patch("app.api.chat.retrieve", side_effect=_retrieve_side_effect):
+        response = client.post(
+            "/api/chat",
+            json={"query": narrative, "corpus_mode": "ipc"},
+            headers=auth_headers(token),
+        )
+    assert response.status_code == 200
+    body = response.json()
+    # The canned "I don't have that" fallback must NOT have won -- the
+    # second retrieval pass found a real chunk, so the real LLM answer path
+    # ran instead.
+    assert body["response"] == "a canned answer"
+    assert "I don't have that" not in body["response"]
+
+
+def test_reformulation_failure_still_returns_the_honest_no_answer_message(client):
+    """If the reformulation call itself fails (LLMError), the fallback must
+    not crash the request -- it degrades to the same honest "I don't have
+    that" response as if no fallback existed at all."""
+    token = signup(client, "narrative-reformulate-fails@example.com")
+    with (
+        patch("app.api.chat.retrieve", return_value=[]),
+        patch("app.api.chat._reformulate_for_retrieval", return_value=None),
+    ):
+        response = client.post(
+            "/api/chat",
+            json={"query": "something with no matching statute text at all"},
+            headers=auth_headers(token),
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert "I don't have that" in body["response"]

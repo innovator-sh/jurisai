@@ -8,7 +8,15 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from app.llm.base import LLMError
 
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+# llama-3.3-70b-versatile was retired from Groq's catalog (confirmed live
+# against the real API: 404 model_not_found, and absent from
+# client.models.list()). openai/gpt-oss-120b is the strongest general-
+# purpose chat model this key currently has access to -- verified directly
+# against the real API, including that it's a reasoning model (spends part
+# of max_tokens on a separate `reasoning` field before `content`; 1024 is
+# comfortably enough headroom for a real legal answer, confirmed with a
+# realistic prompt: ~240 reasoning + ~600 content tokens).
+DEFAULT_MODEL = "openai/gpt-oss-120b"
 TIMEOUT_SECONDS = 15.0
 
 _RETRYABLE = (groq.RateLimitError, groq.APIConnectionError, groq.InternalServerError)

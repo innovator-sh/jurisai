@@ -51,6 +51,7 @@ from app.rag.prompts import (
     build_crosswalk_block,
     build_hybrid_context,
     build_hybrid_system_prompt,
+    build_reformulation_prompt,
     build_system_prompt,
     build_user_message,
     collect_crosswalk_facts,
@@ -65,6 +66,25 @@ logger = get_logger(__name__)
 
 def _sse(event: str, data: str) -> str:
     return f"event: {event}\ndata: {data}\n\n"
+
+
+async def _reformulate_for_retrieval(llm: LLMProvider, query: str) -> str | None:
+    """Fallback only -- called once, only when the first retrieval pass
+    across every routed corpus comes back empty. A free-text narrative
+    ("he said his sister needed eye surgery...") embeds poorly against
+    formal statute text; rewritten into legal-concept terms it retrieves
+    correctly (confirmed directly against the real index: ~0.50/wrong
+    section on the raw narrative vs. ~0.69/correct section reformulated).
+    Never raises -- a reformulation failure just means the original
+    "I don't have that" behaviour stands, not a broken request."""
+    system, user = build_reformulation_prompt(query)
+    try:
+        result = await llm.complete(system, user)
+    except LLMError as e:
+        logger.warning("query_reformulation_failed", error=str(e))
+        return None
+    result = result.strip()
+    return result or None
 
 
 async def _stream_chat(
@@ -142,17 +162,30 @@ async def chat(
     if not routing.corpora:
         raise HTTPException(status_code=422, detail=routing.reason or "Could not resolve a corpus")
 
-    chunks_by_corpus: dict[str, list[RetrievedChunk]] = {
-        c.id: retrieve(
-            qdrant,
-            c,
-            query,
-            k=settings.retrieval_k,
-            score_threshold=settings.retrieval_score_threshold,
-        )
-        for c in routing.corpora
-    }
+    def _retrieve_all(q: str) -> dict[str, list[RetrievedChunk]]:
+        return {
+            c.id: retrieve(
+                qdrant,
+                c,
+                q,
+                k=settings.retrieval_k,
+                score_threshold=settings.retrieval_score_threshold,
+            )
+            for c in routing.corpora
+        }
+
+    chunks_by_corpus = _retrieve_all(query)
     all_chunks = [ch for chunks in chunks_by_corpus.values() for ch in chunks]
+
+    if not all_chunks:
+        # A fact-pattern narrative embeds poorly against formal statute
+        # text (D066) -- retry once against a retrieval-only rewrite before
+        # giving up. Never shown to the user, never used for the answer.
+        reformulated = await _reformulate_for_retrieval(llm, query)
+        if reformulated:
+            chunks_by_corpus = _retrieve_all(reformulated)
+            all_chunks = [ch for chunks in chunks_by_corpus.values() for ch in chunks]
+
     acts = [c.act for c in routing.corpora]
     response_corpus_id = "hybrid" if routing.is_hybrid else routing.corpora[0].id
     no_answer = f"I don't have that in the {' or '.join(acts)}."
