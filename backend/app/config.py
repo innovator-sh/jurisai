@@ -48,8 +48,13 @@ class Settings(BaseSettings):
     mistral_api_key: str = ""
     anthropic_api_key: str = ""
 
-    # Retrieval (Sprint 3)
-    retrieval_k: int = 3
+    # Retrieval (Sprint 3). k raised 3 -> 5 in Sprint 5 (D066): a narrative
+    # fact pattern can genuinely touch more than one offence (e.g. cheating
+    # *and* criminal breach of trust), and the system prompt's narrative
+    # guidance asks the model to surface every section that applies, not
+    # just the single closest match -- k=3 was too narrow to give it that
+    # choice even when the right sections were being retrieved at all.
+    retrieval_k: int = 5
     retrieval_score_threshold: float = 0.5
 
     @field_validator("cors_origins", mode="before")

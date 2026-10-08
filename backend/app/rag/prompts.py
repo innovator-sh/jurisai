@@ -11,6 +11,15 @@ from app.rag.retriever import RetrievedChunk
 
 PROMPT_VERSION = "v1"
 
+_NARRATIVE_GUIDANCE = """If the question describes a fact pattern or narrative rather than \
+asking a direct legal question, identify every section among the excerpts above that \
+plausibly applies to the facts described — not just the single closest match — and \
+briefly say which specific facts support each one. Say explicitly if part of the \
+narrative doesn't correspond to anything in the excerpts, rather than silently ignoring \
+it. You may add general next-step suggestions for handling the case (e.g. which \
+offence(s) to cite when registering a complaint, what kind of evidence to preserve) — \
+label these clearly as suggestions, kept separate from what the cited sections themselves say."""
+
 _SYSTEM_TEMPLATE = """You are JurisAI, a legal information assistant for Indian criminal law.
 
 Answer ONLY using the {act} excerpts provided below. Do not use outside knowledge.
@@ -18,6 +27,8 @@ Every statement must cite its section number, e.g. "(Section 302, {short})".
 If the provided excerpts do not answer the question, say so plainly rather than guessing.
 For any cross-reference to another act's section, use only the VERIFIED
 CORRESPONDENCE section below — never infer one from the excerpts alone.
+
+{narrative_guidance}
 
 This is legal information, not legal advice — always end your answer by recommending \
 the user consult a qualified lawyer for their specific situation."""
@@ -39,12 +50,25 @@ so explicitly rather than implying continuity.
 Never state a section number without naming its act. If the excerpts don't answer the question, \
 say so plainly rather than guessing.
 
+{narrative_guidance}
+
 This is legal information, not legal advice — always end your answer by recommending \
 the user consult a qualified lawyer for their specific situation."""
 
+_REFORMULATION_SYSTEM = """You turn a free-text description of events into a short search query \
+for finding relevant sections of an Indian criminal statute (IPC or BNS).
+
+Extract only the legal concepts and offence types involved — the kind of words that would \
+appear in a penal code section heading (e.g. "cheating", "criminal breach of trust", \
+"assault", "forgery", "theft", "extortion"). Drop names, dates, amounts, platform names, and \
+any other incidental detail that wouldn't appear in statute language.
+
+Output ONLY the search query — a handful of words or short phrases, nothing else. No \
+preamble, no explanation, no punctuation beyond what the terms themselves need."""
+
 
 def build_system_prompt(act: str, short: str) -> str:
-    return _SYSTEM_TEMPLATE.format(act=act, short=short)
+    return _SYSTEM_TEMPLATE.format(act=act, short=short, narrative_guidance=_NARRATIVE_GUIDANCE)
 
 
 def build_hybrid_system_prompt(corpora: list[Corpus]) -> str:
@@ -53,8 +77,22 @@ def build_hybrid_system_prompt(corpora: list[Corpus]) -> str:
     primary, *others = corpora
     other_shorts = " and ".join(c.short for c in others)
     return _HYBRID_SYSTEM_TEMPLATE.format(
-        primary_short=primary.short, primary_act=primary.act, other_shorts=other_shorts
+        primary_short=primary.short,
+        primary_act=primary.act,
+        other_shorts=other_shorts,
+        narrative_guidance=_NARRATIVE_GUIDANCE,
     )
+
+
+def build_reformulation_prompt(query: str) -> tuple[str, str]:
+    """A fact-pattern narrative ("he said his sister needed eye surgery...")
+    embeds poorly against formal statute text -- confirmed directly against
+    the real index: top score ~0.50 (and the wrong section) for the raw
+    narrative, ~0.69 landing on the correct one once reduced to legal-concept
+    terms. Used as a retrieval-only rewrite (api/chat.py's fallback when the
+    first retrieval pass comes back empty) -- never shown to the user, never
+    used for the actual answer, which still sees the original query."""
+    return _REFORMULATION_SYSTEM, query.strip()
 
 
 def build_context_block(chunks: list[RetrievedChunk]) -> str:
