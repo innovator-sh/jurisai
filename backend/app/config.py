@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -36,6 +36,23 @@ class Settings(BaseSettings):
     # False only for local docker-compose without Caddy's TLS in front —
     # a secure cookie is silently never sent back over plain HTTP.
     cookie_secure: bool = True
+
+    # Compliance (Sprint 6). "production" turns on the guard in
+    # _require_compliance_settings_in_production: the app refuses to start
+    # without a named grievance officer and an on-VM security-log directory,
+    # so a deployed instance can never silently ship placeholder values.
+    environment: Literal["development", "production"] = "development"
+    # DPDP Act 2023: a named grievance-officer contact, shown on /privacy.
+    grievance_officer_name: str = ""
+    grievance_officer_email: str = ""
+    grievance_officer_address: str = ""
+    # CERT-In Directions 2022: security events are written here, rotated
+    # daily and kept 180 days, on the India-hosted VM only. Empty disables
+    # the file sink (dev/tests); events still go to stdout.
+    security_log_dir: str = ""
+    # Chat turns auto-expire after this many days (Mongo TTL index), so the
+    # retention period stated in the privacy notice is actually enforced.
+    chat_retention_days: int = 365
 
     # Vector store (Sprint 3)
     qdrant_url: str = "http://qdrant:6333"
@@ -76,6 +93,23 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"LLM_PROVIDER={self.llm_provider!r} but {field.upper()} is not set"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _require_compliance_settings_in_production(self) -> "Settings":
+        if self.environment == "production":
+            required = (
+                "grievance_officer_name",
+                "grievance_officer_email",
+                "grievance_officer_address",
+                "security_log_dir",
+            )
+            missing = [f.upper() for f in required if not getattr(self, f)]
+            if missing:
+                raise ValueError(
+                    f"ENVIRONMENT=production but {', '.join(missing)} not set "
+                    "(DPDP grievance officer + CERT-In log directory are mandatory)"
+                )
         return self
 
 

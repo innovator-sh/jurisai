@@ -13,9 +13,12 @@ DEFAULT_HISTORY_LIMIT = 50
 
 
 class ChatRepository:
-    def __init__(self, db: Database[dict[str, Any]]) -> None:
+    def __init__(self, db: Database[dict[str, Any]], retention_days: int = 365) -> None:
         self.collection: Collection[dict[str, Any]] = db["chat_history"]
         self.collection.create_index([("user_id", 1), ("session_id", 1)])
+        # DPDP: the retention period stated in the privacy notice is enforced
+        # here, not just promised -- Mongo deletes turns older than this.
+        self.collection.create_index("timestamp", expireAfterSeconds=retention_days * 86400)
 
     def insert_turn(
         self,

@@ -47,7 +47,7 @@ jobs:
         # A new branch in any of these without a test fails the build.
         run: >
           uv run coverage report --fail-under=100
-          --include="backend/app/api/auth.py,backend/app/api/sessions.py,backend/app/core/security.py,backend/app/core/rate_limit.py,backend/app/repositories/chat_repository.py,backend/app/repositories/user_repository.py,backend/app/repositories/refresh_token_repository.py"
+          --include="backend/app/api/auth.py,backend/app/api/sessions.py,backend/app/core/security.py,backend/app/core/rate_limit.py,backend/app/core/security_log.py,backend/app/repositories/chat_repository.py,backend/app/repositories/user_repository.py,backend/app/repositories/refresh_token_repository.py"
 
       - name: pip-audit
         run: uv run pip-audit

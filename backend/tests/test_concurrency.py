@@ -58,7 +58,12 @@ async def _signup_many(client: httpx.AsyncClient, n: int) -> list[dict[str, str]
     for i in range(n):
         res = await client.post(
             "/api/auth/signup",
-            json={"email": f"load{i}@example.com", "password": "correct-horse-battery"},
+            json={
+                "email": f"load{i}@example.com",
+                "password": "correct-horse-battery",
+                "role": "lawyer",
+                "consent": True,
+            },
         )
         assert res.status_code == 201, res.text
         headers.append({"Authorization": f"Bearer {res.json()['access_token']}"})

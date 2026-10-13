@@ -5,6 +5,7 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 from pymongo.errors import DuplicateKeyError
 
+from app.core.compliance import Role
 from app.models.user import UserPublic
 
 
@@ -17,17 +18,25 @@ class UserRepository:
         self.collection: Collection[dict[str, Any]] = db["users"]
         self.collection.create_index("email", unique=True)
 
-    def create(self, email: str, password_hash: str) -> UserPublic:
+    def create(
+        self, email: str, password_hash: str, role: Role, consent_version: str
+    ) -> UserPublic:
+        now = datetime.now(UTC)
         doc: dict[str, Any] = {
             "email": email,
             "password_hash": password_hash,
-            "created_at": datetime.now(UTC),
+            "created_at": now,
+            "role": role,
+            "consent_version": consent_version,
+            "consent_accepted_at": now,
         }
         try:
             result = self.collection.insert_one(doc)
         except DuplicateKeyError as e:
             raise EmailAlreadyRegistered(email) from e
-        return UserPublic(id=str(result.inserted_id), email=email, created_at=doc["created_at"])
+        return UserPublic(
+            id=str(result.inserted_id), email=email, created_at=now, role=role
+        )
 
     def get_by_email(self, email: str) -> dict[str, Any] | None:
         return self.collection.find_one({"email": email})
@@ -43,7 +52,13 @@ class UserRepository:
         doc = self.collection.find_one({"_id": oid})
         if doc is None:
             return None
-        return UserPublic(id=str(doc["_id"]), email=doc["email"], created_at=doc["created_at"])
+        return UserPublic(
+            id=str(doc["_id"]),
+            email=doc["email"],
+            created_at=doc["created_at"],
+            # Accounts predating roles get the strictest disclaimer.
+            role=doc.get("role", "citizen"),
+        )
 
     def delete(self, user_id: str) -> bool:
         from bson import ObjectId
