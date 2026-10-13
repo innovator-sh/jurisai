@@ -38,16 +38,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  document.querySelectorAll(".sidebar-menu li[data-nav-href]").forEach((item) => {
-    const navigate = () => window.location.assign(item.getAttribute("data-nav-href"));
-    item.addEventListener("click", navigate);
-    // role="link" + tabindex="0" makes these keyboard-focusable, but a <li>
-    // has no native activation key -- wire Enter/Space ourselves (a11y pass).
-    item.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        navigate();
-      }
+  // Each nav item holds a real <a href> (keyboard, middle-click and screen
+  // readers all work natively). The extra row handler only widens the click
+  // target to the <li>'s padding.
+  document.querySelectorAll(".sidebar-menu li").forEach((item) => {
+    const link = item.querySelector("a.nav-link");
+    if (!link) return;
+    item.addEventListener("click", (e) => {
+      if (e.target.closest("a")) return;
+      window.location.assign(link.getAttribute("href"));
     });
   });
 });

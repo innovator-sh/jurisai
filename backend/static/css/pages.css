@@ -154,8 +154,8 @@ body.light-theme .corpus-pref-option {
 }
 
 .corpus-pref-option.active {
-  background-color: var(--dt-accent);
-  border-color: var(--dt-accent);
+  background-color: var(--dt-accent-fill);
+  border-color: var(--dt-accent-fill);
   color: #ffffff;
 }
 
@@ -180,7 +180,7 @@ body.light-theme .corpus-pref-option.active {
 }
 
 .btn-primary {
-  background-color: var(--dt-accent);
+  background-color: var(--dt-accent-fill);
   color: #ffffff;
 }
 
@@ -306,7 +306,7 @@ body.light-theme .template-card .card-icon {
   color: var(--lt-accent);
 }
 
-.template-card .card-content h3 {
+.template-card .card-content h2 {
   font-size: 1.1rem;
   margin-bottom: 4px;
   display: flex;

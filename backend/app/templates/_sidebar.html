@@ -1,7 +1,7 @@
 {# Included by every page that carries the full app chrome (not login.html).
    Callers pass `active_view` ("chat" | "history" | "templates" | "account" |
    "settings") so the right nav item gets the "active" class -- base.js wires
-   up the click -> navigation behaviour via each item's data-nav-href. #}
+   up click-anywhere-on-the-row navigation; each item holds a real <a href>. #}
 <aside class="sidebar" id="sidebar">
   <div class="logo-container">
     <div class="logo">
@@ -20,13 +20,15 @@
     <div class="sidebar-section">
       <div class="sidebar-title">MAIN</div>
       <ul class="sidebar-menu">
-        <li class="{% if active_view == 'chat' %}active{% endif %}" data-nav-href="/" tabindex="0" role="link">
+        <li class="{% if active_view == 'chat' %}active{% endif %}">
+          <a class="nav-link" href="/" aria-label="New Chat"{% if active_view == 'chat' %} aria-current="page"{% endif %}>
           <span class="menu-icon">
-            <svg class="svg-icon" viewBox="0 0 24 24">
+            <svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
           </span>
           <span class="menu-text">New Chat</span>
+        </a>
         </li>
       </ul>
     </div>
@@ -34,9 +36,10 @@
     <div class="sidebar-section">
       <div class="sidebar-title">RESOURCES</div>
       <ul class="sidebar-menu">
-        <li class="{% if active_view == 'templates' %}active{% endif %}" data-nav-href="/templates" tabindex="0" role="link">
+        <li class="{% if active_view == 'templates' %}active{% endif %}">
+          <a class="nav-link" href="/templates" aria-label="Legal Templates"{% if active_view == 'templates' %} aria-current="page"{% endif %}>
           <span class="menu-icon">
-            <svg class="svg-icon" viewBox="0 0 24 24">
+            <svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -44,18 +47,21 @@
             </svg>
           </span>
           <span class="menu-text">Legal Templates</span>
+        </a>
         </li>
-        <li class="{% if active_view == 'history' %}active{% endif %}" data-nav-href="/?view=history" tabindex="0" role="link">
+        <li class="{% if active_view == 'history' %}active{% endif %}">
+          <a class="nav-link" href="/?view=history" aria-label="History"{% if active_view == 'history' %} aria-current="page"{% endif %}>
           <span class="menu-icon">
-            <svg class="svg-icon" viewBox="0 0 24 24">
+            <svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10"></circle>
               <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
           </span>
           <span class="menu-text">History</span>
+        </a>
         </li>
       </ul>
-      <div class="session-list-container" id="sessionListContainer" style="display: none">
+      <div id="sessionListContainer" class="session-list-container is-hidden">
         <div class="session-list" id="sessionList"></div>
       </div>
     </div>
@@ -63,23 +69,27 @@
     <div class="sidebar-section">
       <div class="sidebar-title">USER</div>
       <ul class="sidebar-menu">
-        <li class="{% if active_view == 'account' %}active{% endif %}" data-nav-href="/account" tabindex="0" role="link">
+        <li class="{% if active_view == 'account' %}active{% endif %}">
+          <a class="nav-link" href="/account" aria-label="Account"{% if active_view == 'account' %} aria-current="page"{% endif %}>
           <span class="menu-icon">
-            <svg class="svg-icon" viewBox="0 0 24 24">
+            <svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
           </span>
           <span class="menu-text">Account</span>
+        </a>
         </li>
-        <li class="{% if active_view == 'settings' %}active{% endif %}" data-nav-href="/settings" tabindex="0" role="link">
+        <li class="{% if active_view == 'settings' %}active{% endif %}">
+          <a class="nav-link" href="/settings" aria-label="Settings"{% if active_view == 'settings' %} aria-current="page"{% endif %}>
           <span class="menu-icon">
-            <svg class="svg-icon" viewBox="0 0 24 24">
+            <svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82"></path>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </span>
           <span class="menu-text">Settings</span>
+        </a>
         </li>
       </ul>
     </div>
