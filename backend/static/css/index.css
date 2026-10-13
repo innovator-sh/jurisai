@@ -38,7 +38,8 @@
     --dt-text: #e2e8f0;
     --dt-text-secondary: #94a3b8;
     --dt-message-bg: #1a1e2c;
-    --dt-user-message-bg: #3b82f6;
+    --dt-user-message-bg: #2563eb; /* white text: 5.2:1 (was #3b82f6 = 3.7:1, fails AA) */
+    --dt-accent-fill: #2563eb; /* accent used as a background behind white text */
     --dt-user-message-text: #ffffff;
     --dt-input-bg: #151824;
     --dt-input-border: #252a3a;
@@ -365,6 +366,30 @@ body.light-theme .sidebar-menu li.active {
     stroke-linejoin: round;
     fill: none;
     transition: transform 0.3s ease;
+}
+
+/* The <li> carries padding/hover/active styling; the <a> inside is the real
+   interactive element and fills the row so the whole item is one link. */
+.sidebar-menu li a.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    color: inherit;
+    text-decoration: none;
+}
+
+.sidebar:not(.expanded) .sidebar-menu li a.nav-link {
+    justify-content: center;
+}
+
+/* Initial-hidden state for elements JS later shows via style.display. An
+   inline style="display:none" would be blocked by the strict CSP. */
+/* Element-qualified so it outranks the later single-class display rules
+   (.send-button, .float-button, ...); JS's inline style.display still wins. */
+button.is-hidden,
+div.is-hidden {
+    display: none;
 }
 
 .sidebar-menu li:hover .svg-icon {
@@ -1367,7 +1392,6 @@ a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-.sidebar-menu li:focus-visible,
 .session-entry :focus-visible,
 .corpus-option:focus-visible,
 .action-button:focus-visible {
@@ -1375,7 +1399,7 @@ textarea:focus-visible,
     outline-offset: 2px;
 }
 
-body.light-theme :is(a, button, input, textarea, .sidebar-menu li, .session-entry, .corpus-option, .action-button):focus-visible {
+body.light-theme :is(a, button, input, textarea, .session-entry, .corpus-option, .action-button):focus-visible {
     outline-color: var(--lt-accent);
 }
 
