@@ -13,25 +13,24 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** Sprint 4 (API hardening) done — the crosswalk at
-`data/crosswalk/ipc_bns.csv` is human-reviewed (`confidence=reviewed` on
-all 380 rows) and now actually consumed: `/api/chat` grounds every
-IPC↔BNS cross-reference in it via `corpora/crosswalk.py`'s `lookup()`
-instead of leaving it to LLM inference (`rag/prompts.py`'s
-`build_crosswalk_block`), and returns it as a structured `crosswalk` field
-on `ChatResponse`. Sprint 4 itself closed out
-`docs/production-hardening-plan.md`'s checklist: global exception handling
-with request-id propagation (`core/errors.py`, `core/request_id.py`, no
-route builds its own error response anymore), CORS from config (and fixed
-a real `Settings()`-crashing bug in `CORS_ORIGINS` parsing along the way),
-security headers, `extra="forbid"` on every request model, a real
-`/readyz` Mongo check, and the `/rename_session` false-404 fix — see
-`docs/decisions.md` for the full list and issue numbers. Sprints 0-4 are
-merged to `main`. Interpretive/data-quality questions from the crosswalk
-review are tracked as issues #74-#77 (D061-D064), still open. Next up:
-**Sprint 5 (frontend rebuild)** — no frontend exists yet in the greenfield
-tree (`api/pages.py` serves only `login.html`) — or Sprint 6 (deploy +
-compliance) in parallel; not yet decided which.
+**Current status:** Sprints 0-4 are done and merged to `main`, and Sprint 5 (frontend
+rebuild) is merged except the FIR form. The app now has a real frontend: Jinja
+`base.html` + `_sidebar.html` shell with per-page templates (`login`, `index`/chat,
+`account`, `settings`, `legal`/templates), vendored `marked` + `DOMPurify` (strict
+CSP `default-src 'self'` -- no inline script/style, no CDN), SSE streaming chat with an
+abort button (`LLMProvider.stream()` in every provider), persisted `currentSessionId`,
+a working account-deletion UI, and an accessibility pass (Lighthouse a11y 1.00 on all
+five pages, zero console/CSP errors). Retrieval handles free-text narrative queries via
+an LLM query-reformulation fallback (`api/chat.py`, `rag/prompts.py`). The crosswalk at
+`data/crosswalk/ipc_bns.csv` is human-reviewed (all 380 rows) and grounds every
+IPC<->BNS cross-reference in `/api/chat` via `corpora/crosswalk.py`.
+
+**Deliberately not built yet:** the FIR form (plan Sprint 5 step 6, issues #22/#43) is
+**blocked until the user supplies real-world FIR requirements** -- do not start it, and
+`/firform` is intentionally not served. Sprint 6 (testing, deploy, DPDP/CERT-In
+compliance, README) has not started and begins only when the user says so. Open
+data-quality questions from the crosswalk review are issues #74-#78; Hindi/hybrid
+retrieval are #58/#59.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
