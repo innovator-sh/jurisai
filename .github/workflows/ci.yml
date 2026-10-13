@@ -39,8 +39,15 @@ jobs:
       - name: Mypy (app/ only — see plan's Verification section)
         run: uv run mypy backend/app
 
-      - name: Pytest
-        run: uv run pytest -q
+      - name: Pytest (with coverage, >= 70% overall via pyproject)
+        run: uv run pytest -q --cov --cov-report=term-missing:skip-covered
+
+      - name: Coverage gate -- auth and ownership paths at 100%
+        # Every file that decides who a caller is or whose data they may touch.
+        # A new branch in any of these without a test fails the build.
+        run: >
+          uv run coverage report --fail-under=100
+          --include="backend/app/api/auth.py,backend/app/api/sessions.py,backend/app/core/security.py,backend/app/core/rate_limit.py,backend/app/repositories/chat_repository.py,backend/app/repositories/user_repository.py,backend/app/repositories/refresh_token_repository.py"
 
       - name: pip-audit
         run: uv run pip-audit
