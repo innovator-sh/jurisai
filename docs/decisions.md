@@ -344,3 +344,85 @@ identically when re-run:**
   deliberately generic query ("general definitions") against section 2's
   sub-split chunks. No new failure category; not tuned toward 100% on a
   14-question set.
+
+## Sprint 6 — Testing, deploy, compliance, documentation
+
+**Status:** items 1, 2, 3 (files only), 4, 5 landed on the `sprint-6` branch; item 6
+(issue reconciliation) happens at merge; item 3's real-VM deployment is **not done** — it
+needs an Oracle account and a domain, so `docs/deploy.md` is validated locally but unproven
+on Oracle. Treat the first real deployment as its test.
+
+**Coverage (item 1).** Baseline 82% overall — above the 70% target — but the token lifecycle
+was almost untested: login success, refresh rotation, refresh-token replay, logout
+revocation and token-type confusion had no tests. Added `test_auth_tokens.py`; the seven
+auth/ownership files plus the new `core/security_log.py` are now at 100%, and CI enforces
+both numbers (70% overall via `pyproject`, 100% on those files via `coverage report
+--include`). Lesson worth keeping: the first draft of the refresh/logout tests *passed
+vacuously* — the refresh cookie is correctly `Secure`, the shared test client speaks
+`http://`, so the cookie was never sent back and "logout revokes the token" was asserting
+nothing. The token tests use an `https://` base URL. `rate_limit.user_or_ip_key`'s IP
+fallback is unreachable over HTTP (slowapi evaluates the key inside the route, after the
+auth dependency), so it is unit-tested directly instead.
+
+**Concurrency (item 2).** `test_concurrency.py` fires 20 simultaneous chats at the real
+route with only the LLM and the vector search stubbed. LLM calls overlap as intended (20
+chats ≈ 0.5 s vs 8 s serial). But `retrieve()` — query embedding plus a Qdrant call — ran
+synchronously inside the `async` handler and stalled every other request: with a 50 ms
+blocking retrieval, 20 chats took **2.48 s against a 0.9 s budget**. Fixed with
+`asyncio.to_thread` (now ≈ 0.56 s). Synchronous pymongo calls (`insert_turn`) are still on
+the loop; they are single indexed writes and were not the measured cost, so they were left.
+
+**Compliance decisions (item 4).**
+- *Roles are self-declared* (citizen / lawyer / police) and only choose how loud the "not
+  legal advice" wording is — never what a user may do. Unknown or missing role (including
+  accounts that predate roles) falls back to the strictest, citizen wording.
+- *Consent is `Literal[True]` on the signup model*, so an absent or false value is a 422 and
+  non-consent can never be recorded as consent. The user document stores the role, the
+  consent timestamp and `CONSENT_VERSION` (bump it when `privacy.html` changes materially).
+  The checkbox also asserts the user is 18+ (DPDP's age of majority for data purposes).
+- *Retention is enforced, not promised:* a Mongo TTL index expires chat turns after
+  `CHAT_RETENTION_DAYS` (default 365). The index is per-turn, so a very old session loses its
+  oldest turns first. Backups are kept `BACKUP_RETENTION_DAYS` (14) and `/privacy` says a
+  deleted account can linger in a backup that long.
+- *Security log (CERT-In):* JSON lines in `SECURITY_LOG_DIR/security.jsonl`, rotated at UTC
+  midnight, `backupCount=180`. Events: signup, signup_rejected_duplicate, login_success,
+  login_failed, token_refresh, refresh_rejected (a revoked or unknown refresh token being
+  presented — the replay signature), logout, account_delete_rejected, account_deleted,
+  rate_limited. It never contains passwords, tokens, raw email addresses or question text —
+  failed logins carry a 16-hex SHA-256 prefix of the email so repeated attempts on one account
+  correlate without the address being stored. Tests assert this against the real file.
+- *Production guard:* `ENVIRONMENT=production` refuses to start without the grievance
+  officer's name, email and address and a security-log directory.
+- *Disclosure that matters:* a user's question text is sent to the LLM provider, whose
+  servers are outside India. That is a processing recipient, not a log sink, so it does not
+  violate "logs never leave the VM" — but it is named on `/privacy` (rendered from the
+  configured provider), not buried.
+- *Not done, deliberately:* the Hindi notice was written without a native-speaker review and
+  the English text without legal review — both must happen before a real launch. There is no
+  self-service data export; access and correction go through the grievance officer.
+
+**Deploy (item 3).** One compose overlay: Caddy is the only public service; the app
+publishes nothing, Qdrant binds to 127.0.0.1 for ingestion. `--forwarded-allow-ips "*"` is
+acceptable *only because* nothing else can reach the app container; if the app is ever
+exposed directly it becomes a client-IP spoofing hole. Container stdout is capped (5 × 50 MB)
+and is not the compliance record — the rotating file on the `security_logs` volume is, and
+`docker compose down -v` would delete it.
+
+**Found while building, fixed:**
+- `login.js` read `data.detail`, but every error body has been `{"error": …}` since Sprint 4,
+  so every failed login/signup showed "Something went wrong." instead of the real reason.
+- Every page request produced a `/favicon.ico` 404 (no icon link); added an SVG favicon.
+- `rag/router.py` hard-coded `(ipc|bns)` in its citation regex, contradicting the rule that
+  corpus ids come only from `definitions.yaml`; a newly onboarded act could never be pinned by
+  "section 438 BNSS". Now built from the registry (longest short name first).
+
+**Open / not solved:**
+- The router has no subject-area notion: default hybrid routing searches *every* enabled
+  corpus and `for_offence_date` returns the first window match. Correct for IPC/BNS (versions
+  of one subject), wrong for BNSS/BSA. Documented in the README's add-a-corpus caveat; needs a
+  design decision before either act is enabled.
+- IPC source provenance: the PDF is an annotated commentary edition inherited from the legacy
+  prototype and its original publisher/edition was never recorded. Its SHA-256 is now in the
+  README; the origin still needs a human answer.
+- Issues #58/#59 (Hindi, hybrid retrieval), #74–#78 (crosswalk data quality), #22/#43 (FIR)
+  remain open — the plan's "every issue closed or wontfix" exit needs a decision on each.
