@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # Chat turns auto-expire after this many days (Mongo TTL index), so the
     # retention period stated in the privacy notice is actually enforced.
     chat_retention_days: int = 365
+    # How long database backups are kept (scripts/backup_mongo.sh reads the
+    # same BACKUP_RETENTION_DAYS). A deleted account can survive in a backup
+    # this long, and /privacy says so.
+    backup_retention_days: int = 14
 
     # Vector store (Sprint 3)
     qdrant_url: str = "http://qdrant:6333"

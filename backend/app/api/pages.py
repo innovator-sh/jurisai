@@ -74,6 +74,7 @@ def privacy_page(request: Request) -> HTMLResponse:
                 settings.llm_provider, settings.llm_provider
             ),
             "retention_days": settings.chat_retention_days,
+            "backup_days": settings.backup_retention_days,
             "security_log_days": SECURITY_LOG_RETENTION_DAYS,
             "grievance_name": settings.grievance_officer_name,
             "grievance_email": settings.grievance_officer_email,

@@ -32,6 +32,12 @@ COPY backend/static ./backend/static
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
+# Writable by the non-root user, and the mount points for the production
+# volumes (docker-compose.prod.yml): a named volume inherits this ownership on
+# first use. /var/log/jurisai holds the CERT-In security log; the cache holds
+# the ~400MB embedding model so it isn't re-downloaded on every redeploy.
+RUN mkdir -p /var/log/jurisai /home/app/.cache     && chown -R app:app /var/log/jurisai /home/app/.cache
+
 USER app
 
 EXPOSE 8000
