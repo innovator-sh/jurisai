@@ -18,6 +18,23 @@ document.addEventListener("DOMContentLoaded", () => {
   async function submitAuth(path) {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
+    const payload = { email, password };
+
+    if (path === "signup") {
+      // DPDP: consent is an affirmative act and the role is required -- the
+      // server enforces both too (422), this just fails fast with a clear message.
+      const role = document.getElementById("role").value;
+      if (!role) {
+        setStatus("Please choose whether you are a citizen, lawyer, or police.", "error");
+        return;
+      }
+      if (!document.getElementById("consent").checked) {
+        setStatus("Please confirm you are 18+ and accept the Privacy Notice to sign up.", "error");
+        return;
+      }
+      payload.role = role;
+      payload.consent = true;
+    }
 
     let res;
     try {
@@ -25,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include", // receive the refresh_token cookie
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       });
     } catch {
       setStatus("Could not reach the server. Please try again.", "error");
@@ -34,7 +51,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setStatus(data.detail || "Something went wrong.", "error");
+      // Every error body is {"error": "<message>", "request_id": ...}
+      // (core/errors.py); a 422 validation failure is the one exception.
+      const message = typeof data.error === "string" ? data.error : null;
+      setStatus(message || "Please check the details you entered.", "error");
       return;
     }
 

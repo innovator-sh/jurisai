@@ -23,6 +23,48 @@ document.addEventListener("DOMContentLoaded", async () => {
   const actionsRow = document.getElementById("actionsRow");
   const corpusToggle = document.getElementById("corpusToggle");
 
+  // ---------- Per-role disclaimer (Sprint 6, DPDP/consumer-safety item) ----------
+  // Role is self-declared at signup and only selects how loudly we say "not
+  // legal advice" -- it never gates access. Anything unknown or unreachable
+  // falls back to the strictest (citizen) wording.
+  const DISCLAIMERS = {
+    citizen: {
+      strong: true,
+      footer:
+        "JurisAI is not a lawyer and this is not legal advice. Answers are general " +
+        "information and may be incomplete or out of date. For your situation, consult a " +
+        "qualified lawyer. Free legal aid: NALSA helpline 15100.",
+      answer:
+        "Not legal advice. This is general information only — please consult a qualified " +
+        "lawyer before acting on it.",
+    },
+    lawyer: {
+      strong: false,
+      footer:
+        "JurisAI is a research aid, not legal advice. Verify every section against the " +
+        "official text before relying on it.",
+    },
+    police: {
+      strong: false,
+      footer:
+        "JurisAI is a reference aid, not legal advice. Verify every section against the " +
+        "official text and consult your legal adviser before acting.",
+    },
+  };
+  let disclaimer = DISCLAIMERS.citizen;
+  try {
+    const meRes = await apiFetch("/api/auth/me");
+    if (meRes.ok) {
+      const me = await meRes.json();
+      disclaimer = DISCLAIMERS[me.role] || DISCLAIMERS.citizen;
+    }
+  } catch {
+    // Network blip: stay on the strictest wording.
+  }
+  const disclaimerEl = document.getElementById("disclaimer");
+  disclaimerEl.textContent = disclaimer.footer; // textContent only
+  disclaimerEl.classList.toggle("disclaimer-strong", disclaimer.strong);
+
   let currentSessionId = null;
   let abortController = null;
   const CORPUS_KEY = "defaultCorpusMode"; // "" | "ipc" | "bns" -- written by settings.js
@@ -87,6 +129,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     messageDiv.append(header, content);
+    if (!isUser && markdown && disclaimer.answer) {
+      // A sibling of .message-content, so streaming re-renders of the answer
+      // text never wipe it.
+      const note = document.createElement("div");
+      note.className = "answer-disclaimer";
+      note.textContent = disclaimer.answer;
+      messageDiv.appendChild(note);
+    }
     chatContainer.appendChild(messageDiv);
     scrollChatToBottom();
     return content; // caller may keep appending to this (streaming)

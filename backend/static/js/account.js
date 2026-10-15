@@ -11,6 +11,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (res.ok) {
       const user = await res.json();
       emailEl.textContent = user.email; // textContent only -- never innerHTML
+      const ROLE_LABELS = {
+        citizen: "Citizen / member of the public",
+        lawyer: "Lawyer / legal professional",
+        police: "Police / law enforcement",
+      };
+      document.getElementById("accountRole").textContent =
+        "Role: " + (ROLE_LABELS[user.role] || user.role);
     } else {
       emailEl.textContent = "Could not load your account.";
     }
