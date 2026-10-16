@@ -26,6 +26,7 @@ provider failure mid-stream can't become an HTTPException (headers are
 already sent), so it becomes an `error` event instead.
 """
 
+import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
@@ -174,7 +175,9 @@ async def chat(
             for c in routing.corpora
         }
 
-    chunks_by_corpus = _retrieve_all(query)
+    # Embedding + a Qdrant query are blocking; on the event loop they'd stall
+    # every other in-flight request (see tests/test_concurrency.py).
+    chunks_by_corpus = await asyncio.to_thread(_retrieve_all, query)
     all_chunks = [ch for chunks in chunks_by_corpus.values() for ch in chunks]
 
     if not all_chunks:
@@ -183,7 +186,7 @@ async def chat(
         # giving up. Never shown to the user, never used for the answer.
         reformulated = await _reformulate_for_retrieval(llm, query)
         if reformulated:
-            chunks_by_corpus = _retrieve_all(reformulated)
+            chunks_by_corpus = await asyncio.to_thread(_retrieve_all, reformulated)
             all_chunks = [ch for chunks in chunks_by_corpus.values() for ch in chunks]
 
     acts = [c.act for c in routing.corpora]

@@ -19,8 +19,13 @@ FAKE_CHUNKS = [
 ]
 
 
-def signup(client, email: str, password: str = "correct-horse-battery") -> str:
-    res = client.post("/api/auth/signup", json={"email": email, "password": password})
+def signup(
+    client, email: str, password: str = "correct-horse-battery", role: str = "lawyer"
+) -> str:
+    res = client.post(
+        "/api/auth/signup",
+        json={"email": email, "password": password, "role": role, "consent": True},
+    )
     assert res.status_code == 201, res.text
     return res.json()["access_token"]
 
@@ -39,7 +44,13 @@ def test_signup_and_me(client):
 def test_signup_duplicate_email_conflicts(client):
     signup(client, "dupe@example.com")
     res = client.post(
-        "/api/auth/signup", json={"email": "dupe@example.com", "password": "whatever123"}
+        "/api/auth/signup",
+        json={
+            "email": "dupe@example.com",
+            "password": "whatever123",
+            "role": "citizen",
+            "consent": True,
+        },
     )
     assert res.status_code == 409
 

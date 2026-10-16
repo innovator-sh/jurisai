@@ -1,0 +1,81 @@
+# Production overlay. Use together with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# What changes vs. local dev: Caddy terminates TLS on 80/443 and is the ONLY
+# thing reachable from the internet (the app, Mongo and Qdrant publish nothing
+# public); everything restarts on boot; the CERT-In security log and the
+# embedding-model cache live on named volumes; the app refuses to start unless
+# the DPDP/CERT-In settings in .env are filled in (ENVIRONMENT=production).
+#
+# Needs Docker Compose >= 2.24 (for the !reset / !override tags).
+
+# Container stdout is capped so it can't fill the VM's disk. This is NOT the
+# CERT-In record: security events are also written to the 180-day rotating file
+# on the security_logs volume, which is what must be retained.
+x-logging: &capped-logs
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  app:
+    restart: unless-stopped
+    logging: *capped-logs
+    ports: !reset []
+    expose:
+      - "8000"
+    environment:
+      ENVIRONMENT: production
+      SECURITY_LOG_DIR: /var/log/jurisai
+      COOKIE_SECURE: "true"
+    volumes:
+      - security_logs:/var/log/jurisai
+      - hf_cache:/home/app/.cache
+    # --forwarded-allow-ips "*" is safe only because the app publishes no port:
+    # the sole peer that can reach it is Caddy, so X-Forwarded-For (the real
+    # client IP, used by the rate limiter and the security log) can be trusted.
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
+
+  mongo:
+    restart: unless-stopped
+    logging: *capped-logs
+
+  qdrant:
+    restart: unless-stopped
+    logging: *capped-logs
+    # Localhost only, so `scripts/ingest.py` can run on the VM itself.
+    ports: !override
+      - "127.0.0.1:6333:6333"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    logging: *capped-logs
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  security_logs:
+  hf_cache:
+  caddy_data:
+  caddy_config:

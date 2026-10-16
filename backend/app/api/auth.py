@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
+from app.core.compliance import CONSENT_VERSION
 from app.core.security import (
     REFRESH_TOKEN_TTL,
     create_access_token,
@@ -21,6 +22,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.core.security_log import audit, email_fingerprint
 from app.deps import (
     ChatRepositoryDep,
     RefreshTokenRepositoryDep,
@@ -64,6 +66,7 @@ def _issue_tokens(
 
 @router.post("/auth/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def signup(
+    request: Request,
     body: SignupRequest,
     response: Response,
     user_repo: UserRepositoryDep,
@@ -71,14 +74,29 @@ def signup(
     settings: SettingsDep,
 ) -> TokenResponse:
     try:
-        user = user_repo.create(body.email, hash_password(body.password))
+        user = user_repo.create(
+            body.email, hash_password(body.password), body.role, CONSENT_VERSION
+        )
     except EmailAlreadyRegistered as e:
+        audit(
+            "signup_rejected_duplicate",
+            request=request,
+            email_hash=email_fingerprint(body.email),
+        )
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered") from e
+    audit(
+        "signup",
+        request=request,
+        user_id=user.id,
+        role=body.role,
+        consent_version=CONSENT_VERSION,
+    )
     return _issue_tokens(response, user.id, settings, refresh_repo)
 
 
 @router.post("/auth/login", response_model=TokenResponse)
 def login(
+    request: Request,
     body: LoginRequest,
     response: Response,
     user_repo: UserRepositoryDep,
@@ -87,8 +105,10 @@ def login(
 ) -> TokenResponse:
     doc = user_repo.get_by_email(body.email)
     if doc is None or not verify_password(body.password, doc["password_hash"]):
+        audit("login_failed", request=request, email_hash=email_fingerprint(body.email))
         # Same message either way — don't tell an attacker which part was wrong.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    audit("login_success", request=request, user_id=str(doc["_id"]))
     return _issue_tokens(response, str(doc["_id"]), settings, refresh_repo)
 
 
@@ -105,10 +125,14 @@ def refresh(
 
     payload = decode_token(token, settings.jwt_secret_key, expected_type="refresh")
     if not refresh_repo.is_valid(payload["jti"]):
+        # A revoked/unknown token being presented is the signature of a
+        # replayed (possibly stolen) refresh token -- worth a security event.
+        audit("refresh_rejected", request=request, user_id=payload["sub"])
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Refresh token revoked or unknown")
 
     # Rotate: the old refresh token is single-use.
     refresh_repo.revoke(payload["jti"])
+    audit("token_refresh", request=request, user_id=payload["sub"])
     return _issue_tokens(response, payload["sub"], settings, refresh_repo)
 
 
@@ -124,6 +148,7 @@ def logout(
         try:
             payload = decode_token(token, settings.jwt_secret_key, expected_type="refresh")
             refresh_repo.revoke(payload["jti"])
+            audit("logout", request=request, user_id=payload["sub"])
         except HTTPException:
             pass  # already invalid/expired — logout still succeeds
     response.delete_cookie(REFRESH_COOKIE)
@@ -137,6 +162,7 @@ def me(user: Annotated[UserPublic, Depends(current_user)]) -> UserPublic:
 
 @router.post("/auth/delete_account", response_model=DeleteAccountResponse)
 def delete_account(
+    request: Request,
     body: DeleteAccountRequest,
     response: Response,
     user: Annotated[UserPublic, Depends(current_user)],
@@ -151,10 +177,12 @@ def delete_account(
     this irreversible."""
     doc = user_repo.get_by_email(user.email)
     if doc is None or not verify_password(body.password, doc["password_hash"]):
+        audit("account_delete_rejected", request=request, user_id=user.id)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid password")
 
     chat_repo.delete_all_for_user(user.id)
     refresh_repo.delete_all_for_user(user.id)
     user_repo.delete(user.id)
+    audit("account_deleted", request=request, user_id=user.id)
     response.delete_cookie(REFRESH_COOKIE)
     return DeleteAccountResponse(success=True)

@@ -15,7 +15,17 @@ from datetime import date
 
 from app.corpora.registry import Corpus, CorpusRegistry
 
-_CITATION_RE = re.compile(r"\bsection\s+\d+[a-z]*\s*(ipc|bns)\b", re.IGNORECASE)
+
+def _citation_pattern(corpora: list[Corpus]) -> re.Pattern[str]:
+    """"section 302 ipc" -> the corpus whose short name follows the number.
+    Built from the registry, not hard-coded, so onboarding a new corpus (e.g.
+    "section 438 bnss") needs no router change -- the same rule as everywhere
+    else that a corpus id comes from definitions.yaml only."""
+    shorts = sorted({c.short.lower() for c in corpora}, key=len, reverse=True)
+    return re.compile(
+        r"\bsection\s+\d+[a-z]*\s*(" + "|".join(re.escape(s) for s in shorts) + r")\b",
+        re.IGNORECASE,
+    )
 
 
 @dataclass(frozen=True)
@@ -63,11 +73,11 @@ def resolve_corpus(
         )
 
     # 3. Explicit citation in the query pins the corpus ("section 302 ipc").
-    citation_match = _CITATION_RE.search(query)
-    if citation_match:
-        cited_id = citation_match.group(1).lower()
-        if cited_id in enabled_ids:
-            return RoutingResult(corpora=[registry.get(cited_id)])
+    by_short = {c.short.lower(): c for c in enabled}
+    if by_short:
+        citation_match = _citation_pattern(enabled).search(query)
+        if citation_match:
+            return RoutingResult(corpora=[by_short[citation_match.group(1).lower()]])
 
     # 4. Default: hybrid across every enabled corpus. With only one enabled,
     # this collapses to a single-corpus result.

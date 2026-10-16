@@ -57,9 +57,11 @@
     </button>
   </div>
 
-  <div class="disclaimer">
-    JurisAI provides information for reference only, not legal advice.
-    Consult a legal professional for assistance.
+  {# Text is set by chat.js from the signed-in user's role (strongest wording
+     for citizens). This is the no-JS / pre-load fallback, i.e. the strict one. #}
+  <div class="disclaimer" id="disclaimer">
+    JurisAI is not a lawyer and this is not legal advice. Consult a qualified
+    lawyer for your situation.
   </div>
 </main>
 

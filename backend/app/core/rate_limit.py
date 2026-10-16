@@ -9,9 +9,12 @@ the real, verified check.
 """
 
 import jwt
-from fastapi import Request
-from slowapi import Limiter
+from fastapi import Request, Response
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+
+from app.core.security_log import audit
 
 
 def user_or_ip_key(request: Request) -> str:
@@ -29,3 +32,9 @@ def user_or_ip_key(request: Request) -> str:
 
 
 limiter = Limiter(key_func=user_or_ip_key)
+
+
+def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
+    """slowapi's stock 429 response, plus a security-log entry (CERT-In)."""
+    audit("rate_limited", request=request, path=request.url.path)
+    return _rate_limit_exceeded_handler(request, exc)

@@ -106,3 +106,35 @@ def test_real_registry_bare_query_defaults_to_hybrid_bns_first():
     result = resolve_corpus(registry, "what is theft")
     assert result.is_hybrid
     assert [c.id for c in result.corpora] == ["bns", "ipc"]
+
+
+def test_citation_routing_works_for_a_corpus_the_router_has_never_heard_of():
+    """Onboarding a corpus is a definitions.yaml entry + a loader -- the router
+    must not need to know the new act's name (it used to hard-code ipc|bns)."""
+    bnss = Corpus(
+        id="bnss",
+        act="Bharatiya Nagarik Suraksha Sanhita, 2023",
+        short="BNSS",
+        jurisdiction="IN",
+        in_force_from=date(2024, 7, 1),
+        in_force_to=None,
+        source="data/bnss",
+        collection="jurisai_bnss",
+        loader="bnss_bare_act",
+        enabled=True,
+    )
+    registry = CorpusRegistry([IPC, BNS, bnss])
+
+    result = resolve_corpus(registry, "what does section 438 BNSS say about anticipatory bail")
+    assert [c.id for c in result.corpora] == ["bnss"]
+
+    # "bns" is a prefix of "bnss": the longer name must win, not be shadowed.
+    result = resolve_corpus(registry, "what is section 103 bns")
+    assert [c.id for c in result.corpora] == ["bns"]
+
+
+def test_a_citation_naming_a_disabled_corpus_does_not_pin_it():
+    disabled_bns = Corpus(**{**BNS.__dict__, "enabled": False})
+    registry = CorpusRegistry([IPC, disabled_bns])
+    result = resolve_corpus(registry, "what is section 103 bns")
+    assert [c.id for c in result.corpora] == ["ipc"]

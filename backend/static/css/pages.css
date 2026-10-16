@@ -392,3 +392,110 @@ body.light-theme .auth-card {
   gap: 10px;
   margin-top: 16px;
 }
+
+/* Signup: role select + DPDP consent */
+.auth-card select.text-input {
+  width: 100%;
+}
+
+.field-note {
+  font-weight: normal;
+  opacity: 0.75;
+  font-size: 0.8rem;
+}
+
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.consent-row input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.auth-card .consent-row label {
+  display: block;
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.auth-card a,
+.privacy-page a {
+  color: var(--dt-accent);
+}
+
+body.light-theme .auth-card a,
+body.light-theme .privacy-page a {
+  color: var(--lt-accent);
+}
+
+/* Privacy notice page */
+.privacy-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+  color: var(--dt-text);
+  line-height: 1.6;
+}
+
+body.light-theme .privacy-page {
+  color: var(--lt-text);
+}
+
+.privacy-page h1 {
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+
+.privacy-page h2 {
+  font-size: 1.15rem;
+  margin: 26px 0 8px;
+}
+
+.privacy-page ul {
+  padding-left: 22px;
+}
+
+.privacy-page .lang-switch {
+  margin: 10px 0 24px;
+  display: flex;
+  gap: 16px;
+}
+
+.privacy-page .notice-meta {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.privacy-page section + section {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--dt-input-border);
+}
+
+body.light-theme .privacy-page section + section {
+  border-top-color: var(--lt-input-border);
+}
+
+.grievance-card {
+  border: 1px solid var(--dt-input-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+}
+
+body.light-theme .grievance-card {
+  border-color: var(--lt-input-border);
+}
+
+.inline-link {
+  color: var(--dt-accent);
+}
+
+body.light-theme .inline-link {
+  color: var(--lt-accent);
+}

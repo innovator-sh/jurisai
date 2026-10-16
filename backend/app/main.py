@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 from qdrant_client import QdrantClient
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -16,9 +15,10 @@ from app.api import auth, chat, health, pages, sessions
 from app.config import Settings, get_settings
 from app.core.errors import http_exception_handler, unhandled_exception_handler
 from app.core.logging import configure_logging, get_logger
-from app.core.rate_limit import limiter
+from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.core.request_id import RequestIDMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.security_log import configure_security_log
 from app.corpora.crosswalk import load_crosswalk
 from app.corpora.registry import load_registry
 from app.llm.factory import build_llm_provider
@@ -30,6 +30,7 @@ from app.repositories.user_repository import UserRepository
 # which failed immediately on a missing var rather than on first use.
 settings: Settings = get_settings()
 configure_logging(settings.log_level)
+configure_security_log(settings.security_log_dir)
 logger = get_logger(__name__)
 
 
@@ -39,7 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     mongo_client: MongoClient[dict[str, Any]] = MongoClient(settings.mongo_uri)
     db = mongo_client["jurisai"]
-    app.state.chat_repository = ChatRepository(db)
+    app.state.chat_repository = ChatRepository(db, settings.chat_retention_days)
     app.state.user_repository = UserRepository(db)
     app.state.refresh_token_repository = RefreshTokenRepository(db)
     logger.info("connected_to_mongo")
@@ -82,7 +83,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIDMiddleware)
 
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_exception_handler)
     app.add_middleware(SlowAPIMiddleware)

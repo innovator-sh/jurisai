@@ -13,24 +13,26 @@ Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1
 that file is the source of truth for design decisions; this file is the quick-reference
 for conventions once code exists here.
 
-**Current status:** Sprints 0-4 are done and merged to `main`, and Sprint 5 (frontend
-rebuild) is merged except the FIR form. The app now has a real frontend: Jinja
-`base.html` + `_sidebar.html` shell with per-page templates (`login`, `index`/chat,
-`account`, `settings`, `legal`/templates), vendored `marked` + `DOMPurify` (strict
-CSP `default-src 'self'` -- no inline script/style, no CDN), SSE streaming chat with an
-abort button (`LLMProvider.stream()` in every provider), persisted `currentSessionId`,
-a working account-deletion UI, and an accessibility pass (Lighthouse a11y 1.00 on all
-five pages, zero console/CSP errors). Retrieval handles free-text narrative queries via
-an LLM query-reformulation fallback (`api/chat.py`, `rag/prompts.py`). The crosswalk at
-`data/crosswalk/ipc_bns.csv` is human-reviewed (all 380 rows) and grounds every
-IPC<->BNS cross-reference in `/api/chat` via `corpora/crosswalk.py`.
+**Current status:** Sprints 0-5 are done and merged to `main` (the FIR form excepted), and
+**Sprint 6 (testing, deploy, compliance, documentation) is in progress** on the `sprint-6`
+branch. The app has a real frontend (Jinja `base.html` shell, strict CSP, vendored
+`marked` + `DOMPurify`, SSE streaming chat, Lighthouse a11y 1.00), IPC + BNS answering with
+a human-reviewed crosswalk (all 380 rows), and -- new in Sprint 6 -- DPDP/CERT-In compliance:
+self-declared role + affirmative consent at signup, a bilingual `/privacy` notice, enforced
+chat retention (Mongo TTL), a 180-day on-VM security log, a production start-up guard,
+role-based disclaimers, a production compose overlay with Caddy, backup/restore/uptime
+scripts, and a full README. CI gates coverage at 70% overall and 100% on the auth/ownership
+files. See `docs/decisions.md` (Sprint 6) for what was decided and what is still open.
 
-**Deliberately not built yet:** the FIR form (plan Sprint 5 step 6, issues #22/#43) is
-**blocked until the user supplies real-world FIR requirements** -- do not start it, and
-`/firform` is intentionally not served. Sprint 6 (testing, deploy, DPDP/CERT-In
-compliance, README) has not started and begins only when the user says so. Open
-data-quality questions from the crosswalk review are issues #74-#78; Hindi/hybrid
-retrieval are #58/#59.
+**Deliberately not built / not done:**
+- The **FIR form** (plan Sprint 5 step 6, issues #22/#43) is **blocked until the user supplies
+  real-world FIR requirements** -- do not start it. `/firform` is intentionally not served.
+- The production deployment has **not been run on a real Oracle VM** -- `docs/deploy.md` is
+  validated locally only. The Hindi privacy text needs native-speaker review and the notice
+  needs legal review before a real launch.
+- Hindi / exact-section-number retrieval (#58, #59) and the crosswalk data-quality
+  questions (#74-#78) are open. The router has no subject-area notion, so do not enable
+  BNSS/BSA before reading the README's add-a-corpus caveat.
 
 **MVP constraints — read before choosing any dependency:**
 - **Free/open-source only.** No paid API, managed service, or SaaS at MVP stage — Groq
@@ -64,8 +66,9 @@ reference material**:
 ## Repository target
 
 This directory's contents are the repository at **https://github.com/innovator-sh/jurisai**
-(`main` branch, private). PRs land on a `sprint-N` branch per the plan's sprint workflow;
-small non-sprint fixes commit directly to `main` rather than opening a PR.
+(`main` branch, private). All changes go on a branch (`sprint-N` for sprint work, a short
+descriptive name for fixes) and land on `main` through a pull request; CI must be green.
+Commit messages: one single-line subject, a blank line, then the details.
 
 ## Build & run
 
@@ -77,7 +80,7 @@ python scripts/ingest.py --corpus ipc   # builds the Qdrant index for one corpus
 python scripts/ingest.py --corpus bns   # (re-run after data/ipc/ or data/bns/ changes)
 ```
 
-`uv run pytest -q` runs the test suite without needing Docker — Mongo, Qdrant, and the
+`uv run pytest -q --cov` runs the test suite (and the coverage gate) without needing Docker — Mongo, Qdrant, and the
 LLM provider are all mocked (`backend/tests/conftest.py`), so it doesn't need a real
 database, a running Qdrant, or the ~400MB embedding model. `uv run ruff check .` and
 `uv run mypy backend/app` are the other two local gates; all three also run in CI.
@@ -91,16 +94,17 @@ either, but it does download the real embedding model and parse the real PDF, so
 ```
 jurisai_greenfield/
 ├── backend/app/            # FastAPI app: api/, core/, llm/, corpora/, rag/, models/, repositories/
-├── backend/templates/      # Jinja, base.html + extends
-├── backend/static/         # CSS/JS
+├── backend/app/templates/  # Jinja: base.html shell, _sidebar.html, one template per page
+├── backend/static/         # CSS/JS, vendored marked + DOMPurify, favicon
 ├── backend/tests/
 ├── data/                   # ipc/, bns/ (LFS); crosswalk/ipc_bns.csv (plain text, human-reviewed by hand)
 ├── scripts/                # ingest.py, eval.py, build_crosswalk.py, seed/migrate (later)
 ├── docs/decisions.md       # ADR-style notes, one per sprint
 ├── docs/production-hardening-plan.md
+├── docs/deploy.md          # Oracle Always Free runbook
 ├── DISCREPANCIES.MD        # pointer only — issues tracked in the repo's Issues tab
 ├── pyproject.toml
-├── Dockerfile / docker-compose.yml
+├── Dockerfile / docker-compose.yml / docker-compose.prod.yml / Caddyfile
 ├── .env.example
 └── .github/workflows/ci.yml
 ```
@@ -130,6 +134,19 @@ jurisai_greenfield/
 - Frontend stays vanilla ES6 + Jinja (no framework), rendered with `textContent` /
   `DOMPurify` — never raw `innerHTML` on model or user-controlled content.
 - Logging via `structlog` to stdout, JSON — never write user query text to a local file.
+- Security events go through `core/security_log.audit()` (180-day rotating file on the VM,
+  CERT-In). Never put a password, token, raw email address or question text in it -- tests
+  assert this against the real file. Never ship logs to a foreign-hosted service.
+- Signup requires a `role` and `consent: true` (`Literal[True]`); the consent text's version
+  is `core.compliance.CONSENT_VERSION` -- bump it when `templates/privacy.html` changes
+  materially. Every deployment-specific value on `/privacy` is rendered from settings.
+- Blocking work (embedding, Qdrant) inside an `async` route goes through `asyncio.to_thread`;
+  `tests/test_concurrency.py` fails if retrieval stalls the event loop.
+- Auth/ownership files are held at 100% coverage in CI (list in `.github/workflows/ci.yml`);
+  a new branch in any of them needs a test. Tests that exercise the `Secure` refresh cookie
+  must use an `https://` client base URL or they pass vacuously.
+- No inline `style=` / `on*=` attributes or inline `<script>` anywhere -- the CSP blocks them
+  silently (an inline `display:none` just leaves the element visible). `test_pages.py` guards it.
 
 ## Rules when editing
 

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}JurisAI — Privacy Notice{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/pages.css') }}" />
+{% endblock %}
+{% block content %}
+{# Digital Personal Data Protection Act, 2023 notice. Bump CONSENT_VERSION in
+   app/core/compliance.py whenever the wording below changes materially, so a
+   stored consent stays attributable to the text the user actually saw. Every
+   value that can differ per deployment (grievance officer, retention, AI
+   provider) is rendered from settings, never hard-coded. #}
+<main class="privacy-page" id="mainContent">
+  <nav class="lang-switch" aria-label="Language">
+    <a href="#english">English</a>
+    <a href="#hindi" lang="hi">हिन्दी</a>
+    <a href="/login">Back to sign in</a>
+  </nav>
+
+  <section id="english" lang="en">
+    <h1>Privacy Notice</h1>
+    <p class="notice-meta">Version {{ consent_version }} · Under the Digital Personal Data Protection Act, 2023</p>
+
+    <h2>What JurisAI is</h2>
+    <p>
+      JurisAI answers questions about Indian criminal law (the Indian Penal Code and the
+      Bharatiya Nyaya Sanhita) by finding the relevant sections and summarising them. It
+      gives general information. <strong>It is not a lawyer and does not give legal advice.</strong>
+    </p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li>Your email address, and your password stored only as a one-way hash (we cannot read it).</li>
+      <li>The role you chose when signing up (citizen, lawyer, or police). This only changes how strongly we remind you that answers are not legal advice.</li>
+      <li>A record of your consent: when you gave it, and which version of this notice you accepted.</li>
+      <li>The questions you ask and the answers you receive (your chat history).</li>
+      <li>Security records: the time, type of event (for example “login”), and IP address of account activity. These never contain your questions, answers or password.</li>
+    </ul>
+
+    <h2>Why we use it</h2>
+    <ul>
+      <li>To create and secure your account.</li>
+      <li>To answer your questions and keep your chat history so you can come back to it.</li>
+      <li>To detect misuse and to keep the security records that Indian law requires.</li>
+    </ul>
+    <p>We do not sell your data, use it for advertising, or use your chats to train AI models.</p>
+
+    <h2>Who else receives it</h2>
+    <p>
+      To write an answer, your question and the matching law text are sent to our AI
+      provider, currently <strong>{{ llm_provider_name }}</strong>. That provider processes the
+      text to generate the answer. Please do not include information in a question that you
+      are not comfortable sharing with them. No one else receives your data.
+    </p>
+
+    <h2>How long we keep it</h2>
+    <ul>
+      <li>Chat history: until you delete it, and in any case automatically removed after {{ retention_days }} days.</li>
+      <li>Your account details and consent record: until you delete your account.</li>
+      <li>Security records: {{ security_log_days }} days, on a server located in India.</li>
+      <li>Backups: copies of the database are kept for {{ backup_days }} days and then deleted, so data you delete can remain in a backup for up to {{ backup_days }} days before it is gone for good.</li>
+    </ul>
+
+    <h2>Your rights</h2>
+    <ul>
+      <li><strong>Erasure:</strong> you can delete your account yourself under Account → Delete account. This immediately and permanently removes your account, chat history and sessions.</li>
+      <li><strong>Access and correction:</strong> to get a summary of the data we hold about you, or to correct it, write to the Grievance Officer below.</li>
+      <li><strong>Withdraw consent:</strong> deleting your account withdraws it. After that we keep only the security records described above, until they expire.</li>
+      <li><strong>Complain:</strong> if we do not resolve a concern, you may complain to the Data Protection Board of India.</li>
+    </ul>
+
+    <h2>Who must be 18+</h2>
+    <p>JurisAI is for adults. You must be 18 or older to create an account.</p>
+
+    <h2>Grievance Officer</h2>
+    <div class="grievance-card">
+      <p>
+        <strong>{{ grievance_name or "Not yet designated" }}</strong><br />
+        {% if grievance_email %}Email: <a href="mailto:{{ grievance_email }}">{{ grievance_email }}</a><br />{% endif %}
+        {% if grievance_address %}{{ grievance_address }}{% endif %}
+      </p>
+    </div>
+    <p>We will respond within the time limit set by the Act and its Rules.</p>
+  </section>
+
+  <section id="hindi" lang="hi">
+    <h1>गोपनीयता सूचना</h1>
+    <p class="notice-meta">संस्करण {{ consent_version }} · डिजिटल व्यक्तिगत डेटा संरक्षण अधिनियम, 2023 के अंतर्गत</p>
+
+    <h2>JurisAI क्या है</h2>
+    <p>
+      JurisAI भारतीय आपराधिक कानून (भारतीय दंड संहिता और भारतीय न्याय संहिता) से जुड़े प्रश्नों
+      के उत्तर देता है — यह संबंधित धाराएँ खोजकर उनका सार प्रस्तुत करता है। यह केवल सामान्य जानकारी
+      देता है। <strong>यह कोई वकील नहीं है और कानूनी सलाह नहीं देता।</strong>
+    </p>
+
+    <h2>हम क्या जानकारी एकत्र करते हैं</h2>
+    <ul>
+      <li>आपका ईमेल पता, और आपका पासवर्ड केवल एकतरफ़ा हैश के रूप में (हम उसे पढ़ नहीं सकते)।</li>
+      <li>साइन-अप के समय आपके द्वारा चुनी गई भूमिका (नागरिक, वकील या पुलिस)। इससे केवल यह तय होता है कि हम आपको यह कितनी प्रमुखता से याद दिलाएँ कि उत्तर कानूनी सलाह नहीं हैं।</li>
+      <li>आपकी सहमति का रिकॉर्ड: आपने कब सहमति दी और इस सूचना का कौन-सा संस्करण स्वीकार किया।</li>
+      <li>आपके द्वारा पूछे गए प्रश्न और मिले उत्तर (आपकी चैट का इतिहास)।</li>
+      <li>सुरक्षा रिकॉर्ड: खाते की गतिविधि का समय, घटना का प्रकार (जैसे “लॉगिन”) और IP पता। इनमें आपके प्रश्न, उत्तर या पासवर्ड कभी नहीं होते।</li>
+    </ul>
+
+    <h2>हम इसका उपयोग क्यों करते हैं</h2>
+    <ul>
+      <li>आपका खाता बनाने और उसे सुरक्षित रखने के लिए।</li>
+      <li>आपके प्रश्नों का उत्तर देने और आपकी चैट का इतिहास सँभालने के लिए, ताकि आप उसे दोबारा देख सकें।</li>
+      <li>दुरुपयोग का पता लगाने और भारतीय कानून द्वारा अपेक्षित सुरक्षा रिकॉर्ड रखने के लिए।</li>
+    </ul>
+    <p>हम आपका डेटा बेचते नहीं हैं, उसे विज्ञापन के लिए उपयोग नहीं करते, और आपकी चैट से AI मॉडल को प्रशिक्षित नहीं करते।</p>
+
+    <h2>यह जानकारी और किसे मिलती है</h2>
+    <p>
+      उत्तर तैयार करने के लिए आपका प्रश्न और संबंधित कानूनी पाठ हमारे AI सेवा-प्रदाता को भेजा जाता है,
+      जो वर्तमान में <strong>{{ llm_provider_name }}</strong> है। वह प्रदाता उत्तर बनाने के लिए इस पाठ को
+      प्रोसेस करता है। कृपया किसी प्रश्न में ऐसी जानकारी न लिखें जिसे आप उनके साथ साझा करने में सहज नहीं हैं।
+      इसके अलावा किसी और को आपका डेटा नहीं मिलता।
+    </p>
+
+    <h2>हम इसे कितने समय तक रखते हैं</h2>
+    <ul>
+      <li>चैट का इतिहास: जब तक आप उसे हटा नहीं देते, और किसी भी स्थिति में {{ retention_days }} दिन बाद अपने-आप हटा दिया जाता है।</li>
+      <li>आपके खाते का विवरण और सहमति का रिकॉर्ड: जब तक आप अपना खाता नहीं हटाते।</li>
+      <li>सुरक्षा रिकॉर्ड: {{ security_log_days }} दिन, भारत में स्थित सर्वर पर।</li>
+      <li>बैकअप: डेटाबेस की प्रतियाँ {{ backup_days }} दिन तक रखी जाती हैं और फिर हटा दी जाती हैं, इसलिए आपके द्वारा हटाया गया डेटा किसी बैकअप में अधिकतम {{ backup_days }} दिन तक बचा रह सकता है।</li>
+    </ul>
+
+    <h2>आपके अधिकार</h2>
+    <ul>
+      <li><strong>मिटाना:</strong> आप खाता → खाता हटाएँ में जाकर अपना खाता स्वयं हटा सकते हैं। इससे आपका खाता, चैट का इतिहास और सत्र तुरंत और स्थायी रूप से हट जाते हैं।</li>
+      <li><strong>जानकारी और सुधार:</strong> हमारे पास आपका कौन-सा डेटा है इसका सार पाने के लिए, या उसे सुधारने के लिए, नीचे दिए गए शिकायत अधिकारी को लिखें।</li>
+      <li><strong>सहमति वापस लेना:</strong> खाता हटाने से आपकी सहमति वापस हो जाती है। इसके बाद केवल ऊपर बताए गए सुरक्षा रिकॉर्ड उनकी अवधि समाप्त होने तक रखे जाते हैं।</li>
+      <li><strong>शिकायत:</strong> यदि आपकी चिंता का समाधान नहीं होता, तो आप भारतीय डेटा संरक्षण बोर्ड में शिकायत कर सकते हैं।</li>
+    </ul>
+
+    <h2>आयु सीमा</h2>
+    <p>JurisAI वयस्कों के लिए है। खाता बनाने के लिए आपकी आयु 18 वर्ष या उससे अधिक होनी चाहिए।</p>
+
+    <h2>शिकायत अधिकारी</h2>
+    <div class="grievance-card">
+      <p>
+        <strong>{{ grievance_name or "अभी नियुक्त नहीं" }}</strong><br />
+        {% if grievance_email %}ईमेल: <a href="mailto:{{ grievance_email }}">{{ grievance_email }}</a><br />{% endif %}
+        {% if grievance_address %}{{ grievance_address }}{% endif %}
+      </p>
+    </div>
+    <p>हम अधिनियम और उसके नियमों द्वारा निर्धारित समय-सीमा के भीतर उत्तर देंगे।</p>
+  </section>
+</main>
+{% endblock %}

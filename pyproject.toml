@@ -33,6 +33,7 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
     "pip-audit>=2.7",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]
@@ -46,6 +47,14 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["backend/app"]
+
+[tool.coverage.report]
+# Sprint 6 exit criterion: >= 70% on app/. (The auth/ownership files are held
+# to 100% separately -- see the "Coverage gate" step in ci.yml.)
+fail_under = 70
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]

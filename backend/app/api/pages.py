@@ -13,14 +13,28 @@ linking to a half-built page.
 """
 
 from pathlib import Path
+from typing import cast
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
+from app.config import Settings
+from app.core.compliance import CONSENT_VERSION, SECURITY_LOG_RETENTION_DAYS
+
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
+
+
+# Who actually receives a user's question text, named plainly on /privacy
+# (DPDP: disclose recipients). Unknown providers fall back to the raw id.
+_LLM_PROVIDER_DISCLOSURE = {
+    "groq": "Groq, Inc. (United States)",
+    "mistral": "Mistral AI (France)",
+    "anthropic": "Anthropic, PBC (United States)",
+    "bedrock": "Amazon Web Services",
+}
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -46,3 +60,24 @@ def account_page(request: Request) -> HTMLResponse:
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "settings.html", {"active_view": "settings"})
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request) -> HTMLResponse:
+    settings = cast(Settings, request.app.state.settings)
+    return templates.TemplateResponse(
+        request,
+        "privacy.html",
+        {
+            "consent_version": CONSENT_VERSION,
+            "llm_provider_name": _LLM_PROVIDER_DISCLOSURE.get(
+                settings.llm_provider, settings.llm_provider
+            ),
+            "retention_days": settings.chat_retention_days,
+            "backup_days": settings.backup_retention_days,
+            "security_log_days": SECURITY_LOG_RETENTION_DAYS,
+            "grievance_name": settings.grievance_officer_name,
+            "grievance_email": settings.grievance_officer_email,
+            "grievance_address": settings.grievance_officer_address,
+        },
+    )

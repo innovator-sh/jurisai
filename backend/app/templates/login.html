@@ -23,6 +23,25 @@
         minlength="8"
       />
 
+      <label for="role">I am a <span class="field-note">(needed to sign up)</span></label>
+      <select id="role" class="text-input">
+        <option value="">Select…</option>
+        <option value="citizen">Citizen / member of the public</option>
+        <option value="lawyer">Lawyer / legal professional</option>
+        <option value="police">Police / law enforcement</option>
+      </select>
+
+      <div class="consent-row">
+        <input type="checkbox" id="consent" />
+        <label for="consent">
+          I am 18 or older and I have read the
+          <a href="/privacy" target="_blank" rel="noopener">Privacy Notice</a>
+          (<a href="/privacy#hindi" target="_blank" rel="noopener" lang="hi">हिन्दी</a>)
+          and consent to JurisAI processing my account and chat data as described.
+          <span class="field-note">(needed to sign up)</span>
+        </label>
+      </div>
+
       <div class="auth-actions">
         <button type="submit" id="login-btn" class="btn btn-primary">Log in</button>
         <button type="button" id="signup-btn" class="btn btn-secondary">Sign up</button>

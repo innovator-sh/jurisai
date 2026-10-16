@@ -821,6 +821,30 @@ body.light-theme .disclaimer {
     color: var(--lt-disclaimer);
 }
 
+/* Citizens: the louder wording must also look louder, not just read louder. */
+.disclaimer.disclaimer-strong {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--dt-text);
+}
+
+body.light-theme .disclaimer.disclaimer-strong {
+    color: var(--lt-text);
+}
+
+.answer-disclaimer {
+    margin: 8px 0 0 48px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    border-left: 3px solid var(--dt-accent);
+    color: var(--dt-text-secondary);
+}
+
+body.light-theme .answer-disclaimer {
+    border-left-color: var(--lt-accent);
+    color: var(--lt-text-secondary);
+}
+
 /* Actions row above input */
 .actions-row {
     display: flex;
