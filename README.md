@@ -237,3 +237,11 @@ docker-compose.yml  local stack;  docker-compose.prod.yml + Caddyfile  productio
 
 Work happens on `sprint-N` branches merged by pull request. Open issues are tracked in the
 repository's Issues tab (labels `severity:S0–S3`, `sprint:N`), not in a committed file.
+
+## License
+
+The code is released under the [PolyForm Strict License 1.0.0](LICENSE). In short, you can read it and
+run it for noncommercial purposes. You cannot modify it, redistribute it, or build your own
+application from it. This is a source-available license, not an open-source one. It covers this code
+only. The source PDFs in `data/` belong to their publishers, and each dependency keeps its own license.
+For any other use, contact the repository owner through GitHub.
