@@ -43,7 +43,7 @@ The hit rates are produced by the `eval` jobs in CI (`scripts/eval.py`), and the
 flowchart LR
     U[Browser<br/>vanilla JS + Jinja] -->|HTTPS| C[Caddy<br/>TLS]
     C --> A[FastAPI app]
-    A --> R{Corpus router<br/>explicit pick, offence date,<br/>"section N ipc", else hybrid}
+    A --> R{"Corpus router<br/>explicit pick, offence date,<br/>#quot;section N ipc#quot;, else hybrid"}
     R --> Q[(Qdrant<br/>one collection per corpus)]
     A --> X[Crosswalk lookup<br/>reviewed CSV]
     A --> L[LLM provider<br/>Groq / Mistral]
