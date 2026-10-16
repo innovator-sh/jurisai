@@ -122,7 +122,12 @@ async def test_blocking_retrieval_does_not_serialize_concurrent_chats(app_client
     with patch("app.api.chat.retrieve", side_effect=blocking_retrieve):
         elapsed = await _fire(app_client, headers)
 
-    # On the loop: ~N*0.05 = 1.0s of serialized retrieval stacked on the 0.4s LLM
-    # overlap. Off the loop: the 20 retrievals overlap in worker threads.
-    budget = LLM_LATENCY + (N * RETRIEVAL_LATENCY) / 2
+    # On the loop the retrievals run one after another: N*0.05 = 1.0s, then the last
+    # request's 0.4s LLM call, so broken code can never finish under `floor` (1.4s;
+    # measured 2.48s locally). Off the loop the retrievals overlap in worker threads
+    # (~0.56s locally, ~0.9s seen on a shared CI runner). The budget sits below the floor
+    # but leaves CI jitter room -- a budget of 0.9s failed CI at 0.903s.
+    floor = LLM_LATENCY + N * RETRIEVAL_LATENCY
+    budget = LLM_LATENCY + 0.8 * N * RETRIEVAL_LATENCY
+    assert budget < floor, "budget no longer catches a blocked event loop"
     assert elapsed < budget, f"{elapsed:.2f}s (budget {budget:.2f}s) -- retrieval blocks the loop"
