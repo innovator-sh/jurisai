@@ -12,8 +12,6 @@ human-reviewed IPC ↔ BNS correspondence so you can tell what a section became 
 > Free legal aid in India: NALSA helpline **15100**. The app repeats this wording to every
 > user, more strongly for self-declared citizens than for lawyers and police.
 
-For contributor conventions see [`CLAUDE.md`](CLAUDE.md).
-
 ## Results at a glance
 
 The hit rates are produced by the `eval` jobs in CI (`scripts/eval.py`), and the test and coverage figures by the `test` job.
