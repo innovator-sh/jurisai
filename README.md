@@ -16,6 +16,17 @@ For design rationale and the sprint plan see [`docs/production-hardening-plan.md
 for what was decided and why, per sprint, see [`docs/decisions.md`](docs/decisions.md);
 for contributor conventions see [`CLAUDE.md`](CLAUDE.md).
 
+## Results at a glance
+
+The hit rates are produced by the `eval` jobs in CI (`scripts/eval.py`), and the test and coverage figures by the `test` job.
+
+| Measure | Result |
+|---|---|
+| Retrieval hit rate (CI eval sets) | IPC 18/20 (90%), BNS 12/14 (86%) — small sets, wide error bars |
+| Tests / coverage | 164 tests; 86% overall; 100% on the 8 auth and ownership files |
+| Lighthouse accessibility | 1.00 on all 5 pages |
+| Not measured yet | Accuracy gain over the first prototype, answer correctness, FIR time saved |
+
 ## Status
 
 | Area | State |
@@ -212,6 +223,8 @@ ingest run, and an eval set** — but read the caveat at the end first.
 
 - Hindi and bare section-number queries ("धारा 302") are not retrieved reliably — #58, #59.
 - IPC source edition/publisher is unrecorded (see provenance table).
+- 11 IPC sections are skipped at ingest because the parser's confidence is low (13, 15, 16, 138A,
+  216B, 226, **376**, 478, 480, 490, 492). Questions about them can return a wrong or empty result.
 - Data-quality questions from the crosswalk review remain open — #74–#78.
 - The FIR form is not built — #22, #43.
 - Not run on a real Oracle VM yet; see the status note in `docs/deploy.md`.
