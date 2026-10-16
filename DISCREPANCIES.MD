@@ -1,7 +1,6 @@
 # DISCREPANCIES — pointer
 
-Open issues are tracked as **GitHub Issues** on this repo, not in a committed file —
-see `docs/production-hardening-plan.md` ("Open-issue tracking") for why. Filter by:
+Open issues are tracked as **GitHub Issues** on this repo, not in a committed file. Filter by:
 
 - Severity: `severity:S0` (exploitable) · `severity:S1` (broken) · `severity:S2`
   (correctness) · `severity:S3` (hygiene)

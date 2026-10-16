@@ -1,6 +1,6 @@
 # BNS counterpart to ipc_questions.yaml — same discipline: only
 # well-established, high-confidence sections, verified against the actual
-# parsed corpus (see docs/decisions.md) rather than assumed.
+# parsed corpus rather than assumed.
 questions:
   - query: "What is the punishment for murder under the BNS?"
     expected_section: "103"

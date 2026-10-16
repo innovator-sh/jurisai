@@ -2,10 +2,10 @@
 top of the corpus registry, Qdrant retriever, LLMProvider, and — as of
 Sprint 3B — hybrid retrieval across both ipc and bns.
 
-Closes from Sprint 3: D024, D025, D031, D034/D035/D036/D037/D040 (see that
-sprint's docs/decisions.md entry). Sprint 3B additionally wires the router's
-hybrid default (previously unreachable — Sprint 3 only ever had one corpus
-enabled) into an actual multi-corpus retrieval + answer contract.
+Closes from Sprint 3: D024, D025, D031, D034/D035/D036/D037/D040. Sprint 3B
+additionally wires the router's hybrid default (previously unreachable —
+Sprint 3 only ever had one corpus enabled) into an actual multi-corpus
+retrieval + answer contract.
 
 D014 closed Sprint 4 (core/errors.py's global handlers, not a per-route fix
 — this route never built its own error response to begin with).

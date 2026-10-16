@@ -12,7 +12,7 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
     ignore:
-      # Being removed entirely in Sprint 3 (see docs/decisions.md) — no point
+      # Being removed entirely in Sprint 3 — no point
       # reviewing bumps to a dependency that's about to be deleted.
       - dependency-name: "langchain-community"
       - dependency-name: "langchain-text-splitters"

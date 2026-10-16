@@ -1,7 +1,7 @@
 # ~20 questions with known-correct expected IPC sections, used to measure
 # retrieval-hit-rate (item 10 of Sprint 3). Deliberately smaller than the
 # "~30" in the plan and restricted to well-established, high-confidence
-# sections — see docs/decisions.md for why: getting an *expected answer*
+# sections: getting an *expected answer*
 # wrong in a legal-tool's own eval set is its own correctness risk, and the
 # sections excluded by chunking.py's confidence threshold (107, 108, 109,
 # 121, 375, 376, 464) obviously can't be tested here either.

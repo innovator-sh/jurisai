@@ -2,8 +2,7 @@ r"""Loader for the IPC source: an annotated commentary edition (~1870 pages:
 statute text interleaved with case law, footnotes, and cross-references
 under `[s <N>]` markers) — not a bare-act text. Several things follow from
 that, each found by testing this parser against known sections (302, 379,
-420, 375, 34, ...) before trusting it — see docs/decisions.md for the full
-list:
+420, 375, 34, ...) before trusting it:
 
 1. A genuine section heading is a `[s N] Title.` line that STARTS a line of
    its own — sometimes preceded by a footnote-number artifact like

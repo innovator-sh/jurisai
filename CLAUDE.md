@@ -8,10 +8,9 @@ JurisAI is a RAG-based legal assistant for Indian criminal law, being built for 
 by police, lawyers, and the general public — not a demo or student project. It answers
 questions against the Indian Penal Code (IPC) today and is being designed so the
 Bharatiya Nyaya Sanhita (BNS), which replaced the IPC for offences on or after 1 July
-2024, can be onboarded as a second corpus without a rewrite. See
-`docs/production-hardening-plan.md` for the full architecture and sprint plan —
-that file is the source of truth for design decisions; this file is the quick-reference
-for conventions once code exists here.
+2024, can be onboarded as a second corpus without a rewrite. The design
+plan and decision log are kept privately by the maintainer and are not in this repository;
+this file is the quick-reference for conventions.
 
 **Current status:** Sprints 0-5 are done and merged to `main` (the FIR form excepted), and
 **Sprint 6 (testing, deploy, compliance, documentation) is in progress** on the `sprint-6`
@@ -22,12 +21,12 @@ self-declared role + affirmative consent at signup, a bilingual `/privacy` notic
 chat retention (Mongo TTL), a 180-day on-VM security log, a production start-up guard,
 role-based disclaimers, a production compose overlay with Caddy, backup/restore/uptime
 scripts, and a full README. CI gates coverage at 70% overall and 100% on the auth/ownership
-files. See `docs/decisions.md` (Sprint 6) for what was decided and what is still open.
+files.
 
 **Deliberately not built / not done:**
 - The **FIR form** (plan Sprint 5 step 6, issues #22/#43) is **blocked until the user supplies
   real-world FIR requirements** -- do not start it. `/firform` is intentionally not served.
-- The production deployment has **not been run on a real Oracle VM** -- `docs/deploy.md` is
+- The production deployment has **not been run on a real Oracle VM** -- the deployment files are
   validated locally only. The Hindi privacy text needs native-speaker review and the notice
   needs legal review before a real launch.
 - Hindi / exact-section-number retrieval (#58, #59) and the crosswalk data-quality
@@ -99,9 +98,6 @@ jurisai_greenfield/
 ├── backend/tests/
 ├── data/                   # ipc/, bns/ (LFS); crosswalk/ipc_bns.csv (plain text, human-reviewed by hand)
 ├── scripts/                # ingest.py, eval.py, build_crosswalk.py, seed/migrate (later)
-├── docs/decisions.md       # ADR-style notes, one per sprint
-├── docs/production-hardening-plan.md
-├── docs/deploy.md          # Oracle Always Free runbook
 ├── DISCREPANCIES.MD        # pointer only — issues tracked in the repo's Issues tab
 ├── pyproject.toml
 ├── Dockerfile / docker-compose.yml / docker-compose.prod.yml / Caddyfile

@@ -6,7 +6,7 @@ section-number lexical matching) is a deliberately separate, larger piece
 of work: it needs a ~2GB model download, the `FlagEmbedding` package for
 its sparse output, and Qdrant's sparse-vector API, none of which this
 sprint's time budget covers testing properly. Tracked open, not silently
-dropped — see docs/decisions.md.
+dropped.
 """
 
 from functools import lru_cache
