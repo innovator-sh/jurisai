@@ -1,5 +1,4 @@
-"""Loader for the official BNS bare-act text (NCRB's published PDF — see
-docs/decisions.md for provenance and why this source was chosen over the
+"""Loader for the official BNS bare-act text (NCRB's published PDF, chosen over the
 MHA Gazette copy). Unlike the IPC source, this is a genuine bare-act: no
 case-law commentary interleaved, no footnote-quoted superseded text, no
 "COMMENT" boundary to search for. That structural difference is exactly why
@@ -10,7 +9,7 @@ parser against this PDF finds zero sections).
 
 Three things found by testing against known sections (63, 103, 303, 318,
 ...) before trusting this parser, matching all 358 of BNS's official
-section count with zero duplicates once fixed — see docs/decisions.md:
+section count with zero duplicates once fixed:
 
 1. Section markers are plain `N. Whoever...` at a line start — no bracket
    tag. But the marginal title for a section sits on its own line

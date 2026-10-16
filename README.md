@@ -12,10 +12,6 @@ human-reviewed IPC ↔ BNS correspondence so you can tell what a section became 
 > Free legal aid in India: NALSA helpline **15100**. The app repeats this wording to every
 > user, more strongly for self-declared citizens than for lawyers and police.
 
-For design rationale and the sprint plan see [`docs/production-hardening-plan.md`](docs/production-hardening-plan.md);
-for what was decided and why, per sprint, see [`docs/decisions.md`](docs/decisions.md);
-for contributor conventions see [`CLAUDE.md`](CLAUDE.md).
-
 ## Results at a glance
 
 The hit rates are produced by the `eval` jobs in CI (`scripts/eval.py`), and the test and coverage figures by the `test` job.
@@ -109,8 +105,8 @@ files (`api/auth.py`, `api/sessions.py`, `core/security.py`, `core/rate_limit.py
 ## Deploy
 
 One Oracle Cloud Always Free VM (Mumbai/Hyderabad), `docker compose` with Caddy for TLS,
-self-hosted MongoDB and Qdrant, nightly backups, ₹0/month. Full runbook, including the two
-firewall layers people forget: **[`docs/deploy.md`](docs/deploy.md)**.
+self-hosted MongoDB and Qdrant, nightly backups, ₹0/month. The deployment files are in this
+repository: `docker-compose.prod.yml`, `Caddyfile` and `scripts/`.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
@@ -144,9 +140,6 @@ changing one means updating this table **and** the checksum.
 | BNS, 2023 | `data/bns/bns-data.pdf` | NCRB's published bare-act PDF, retrieved 2026-09-18; chosen over the MHA Gazette copy because it includes the section index and the official correspondence table. Section count checked against the official 358. | `a83f12a93e32c9e0b39a85f75850a448dc4682b1b44b2d6bd680165bb9931549` |
 | IPC ↔ BNS crosswalk | `data/crosswalk/ipc_bns.csv` | 380 rows built from the NCRB "Corresponding Section Table" (356 rows) plus 24 inferred-repealed candidates; every row human-reviewed (`confidence=reviewed`). | (plain-text CSV, reviewed in git history) |
 
-Full checksums, parsing decisions and the bugs found per source are in
-[`docs/decisions.md`](docs/decisions.md).
-
 ## MVP stack vs. funded-phase swaps
 
 Everything at MVP is free/open-source and self-hosted. A funded phase swaps components behind
@@ -172,8 +165,7 @@ ingest run, and an eval set** — but read the caveat at the end first.
 1. **Get an authentic source.** India Code or the Gazette of India only, never a draft or an
    unofficial re-typeset copy — a bad source silently corrupts every answer. Put the PDF in
    `data/<id>/` (it is tracked by Git LFS via `.gitattributes`).
-2. **Record provenance.** Add a row to the table above and a section to
-   [`docs/decisions.md`](docs/decisions.md): where it came from, the retrieval date, the
+2. **Record provenance.** Add a row to the table above: where it came from, the retrieval date, the
    SHA-256 (`sha256sum data/<id>/*.pdf`).
 3. **Declare it** in `backend/app/corpora/definitions.yaml`: `id`, `act`, `short` (this is the
    name users type, e.g. `section 438 BNSS`), `in_force_from`/`in_force_to`, `source`,
@@ -227,7 +219,7 @@ ingest run, and an eval set** — but read the caveat at the end first.
   216B, 226, **376**, 478, 480, 490, 492). Questions about them can return a wrong or empty result.
 - Data-quality questions from the crosswalk review remain open — #74–#78.
 - The FIR form is not built — #22, #43.
-- Not run on a real Oracle VM yet; see the status note in `docs/deploy.md`.
+- Not run on a real Oracle VM yet.
 - Access to or correction of stored data is handled by writing to the grievance officer
   (stated on `/privacy`); there is no self-service export.
 - No browser end-to-end suite in CI yet (verified manually with Chrome + Lighthouse).
@@ -240,9 +232,16 @@ backend/static/     CSS, JS, vendored marked + DOMPurify
 backend/tests/      pytest suite (+ eval/ question sets)
 data/               source PDFs (Git LFS) and the reviewed crosswalk CSV
 scripts/            ingest.py, eval.py, build_crosswalk.py, backup/restore/uptime scripts
-docs/               production-hardening-plan.md, decisions.md, deploy.md
 docker-compose.yml  local stack;  docker-compose.prod.yml + Caddyfile  production overlay
 ```
 
 Work happens on `sprint-N` branches merged by pull request. Open issues are tracked in the
 repository's Issues tab (labels `severity:S0–S3`, `sprint:N`), not in a committed file.
+
+## License
+
+The code is released under the [PolyForm Strict License 1.0.0](LICENSE). In short, you can read it and
+run it for noncommercial purposes. You cannot modify it, redistribute it, or build your own
+application from it. This is a source-available license, not an open-source one. It covers this code
+only. The source PDFs in `data/` belong to their publishers, and each dependency keeps its own license.
+For any other use, contact the repository owner through GitHub.
