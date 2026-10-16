@@ -32,10 +32,10 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Node (frontend tooling, if any)
+# Node
 node_modules/
 
 .claude/
-# Local-only project notes (kept on disk, not in the repository)
+# Local-only project notes
 CLAUDE.md
 DISCREPANCIES.MD
